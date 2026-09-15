@@ -128,6 +128,7 @@ function renderAuth() {
   }
 
   h += '</div></div>'
+  if (state.toastMsg) h += `<div class="toast">${esc(state.toastMsg)}</div>`
   return h
 }
 
