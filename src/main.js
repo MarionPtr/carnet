@@ -11,7 +11,12 @@ import {
   saveProfile,
   addLog,
   deleteLog,
-  uid
+  uid,
+  signup,
+  login,
+  logout,
+  getSession,
+  onAuthStateChange
 } from './lib/db'
 import {
   round,
@@ -26,6 +31,7 @@ import {
 
 // État global
 const state = {
+  user: null,
   tab: 'today',
   ready: false,
   ingredients: [],
@@ -38,11 +44,22 @@ const state = {
   logType: 'recipe',
   _draftIngredient: null,
   _draftRecipe: null,
-  categories: ['condiment', 'dessert', 'epice', 'feculent', 'fromage', 'fruit', 'legume', 'legumineuse', 'Proteine']
+  categories: ['condiment', 'dessert', 'epice', 'feculent', 'fromage', 'fruit', 'legume', 'legumineuse', 'Proteine'],
+  authMode: 'login' // 'login' ou 'signup'
 }
 
 // Initialisation
 async function init() {
+  // Vérifier la session
+  const { data: session } = await getSession()
+  state.user = session?.user || null
+
+  if (!state.user) {
+    state.ready = true
+    render()
+    return
+  }
+
   try {
     state.ingredients = await loadIngredients()
     state.recipes = await loadRecipes()
@@ -69,6 +86,13 @@ function render() {
     return
   }
 
+  // Si pas connecté, afficher l'écran d'auth
+  if (!state.user) {
+    app.innerHTML = renderAuth()
+    bindAuthEvents()
+    return
+  }
+
   let html = ''
   if (state.tab === 'today') html = renderToday()
   else if (state.tab === 'ingredients') html = renderIngredients()
@@ -81,6 +105,89 @@ function render() {
 
   app.innerHTML = html
   bindEvents()
+}
+
+// ========== AUTH ==========
+function renderAuth() {
+  let h = '<div style="max-width:480px;margin:0 auto;padding:20px;min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;">'
+  h += '<div style="width:100%;max-width:400px;">'
+  h += '<h1 style="text-align:center;font-size:28px;margin-bottom:30px;font-family:Fraunces,serif;">Carnet</h1>'
+
+  if (state.authMode === 'login') {
+    h += '<h2 style="font-size:18px;margin-bottom:20px;">Connexion</h2>'
+    h += '<label class="field"><span class="lbl">Email</span><input id="auth-email" type="email" placeholder="ton@email.com"/></label>'
+    h += '<label class="field"><span class="lbl">Mot de passe</span><input id="auth-password" type="password" placeholder="••••••••"/></label>'
+    h += '<button class="btn primary block" data-action="auth-login">Se connecter</button>'
+    h += '<p style="text-align:center;margin-top:16px;font-size:13px;color:var(--text-muted);">Pas encore de compte ? <button class="btn" style="background:none;border:none;color:var(--protein);padding:0;cursor:pointer;" data-action="auth-toggle-signup">S\'inscrire</button></p>'
+  } else {
+    h += '<h2 style="font-size:18px;margin-bottom:20px;">Créer un compte</h2>'
+    h += '<label class="field"><span class="lbl">Email</span><input id="auth-email" type="email" placeholder="ton@email.com"/></label>'
+    h += '<label class="field"><span class="lbl">Mot de passe</span><input id="auth-password" type="password" placeholder="••••••••"/></label>'
+    h += '<button class="btn primary block" data-action="auth-signup">S\'inscrire</button>'
+    h += '<p style="text-align:center;margin-top:16px;font-size:13px;color:var(--text-muted);">Déjà un compte ? <button class="btn" style="background:none;border:none;color:var(--protein);padding:0;cursor:pointer;" data-action="auth-toggle-login">Se connecter</button></p>'
+  }
+
+  h += '</div></div>'
+  return h
+}
+
+function bindAuthEvents() {
+  const app = document.getElementById('app')
+  app.querySelectorAll('[data-action]').forEach(el => {
+    el.addEventListener('click', () => {
+      const action = el.getAttribute('data-action')
+      if (action === 'auth-login') {
+        const email = document.getElementById('auth-email').value.trim()
+        const password = document.getElementById('auth-password').value
+        if (!email || !password) {
+          showToast('Remplis email et mot de passe')
+          return
+        }
+        handleLogin(email, password)
+      } else if (action === 'auth-signup') {
+        const email = document.getElementById('auth-email').value.trim()
+        const password = document.getElementById('auth-password').value
+        if (!email || !password) {
+          showToast('Remplis email et mot de passe')
+          return
+        }
+        if (password.length < 6) {
+          showToast('Mot de passe trop court (min 6 caractères)')
+          return
+        }
+        handleSignup(email, password)
+      } else if (action === 'auth-toggle-login') {
+        state.authMode = 'login'
+        render()
+      } else if (action === 'auth-toggle-signup') {
+        state.authMode = 'signup'
+        render()
+      }
+    })
+  })
+}
+
+async function handleLogin(email, password) {
+  const { data, error } = await login(email, password)
+  if (error) {
+    showToast('Erreur: ' + (error.message || 'identifiants incorrects'))
+    return
+  }
+  state.user = data.user
+  state.ready = false
+  render()
+  init()
+}
+
+async function handleSignup(email, password) {
+  const { data, error } = await signup(email, password)
+  if (error) {
+    showToast('Erreur: ' + (error.message || 'inscription échouée'))
+    return
+  }
+  showToast('Compte créé ! Vérifie ton email')
+  state.authMode = 'login'
+  render()
 }
 
 // ========== TODAY ==========
@@ -268,6 +375,11 @@ function renderProfile() {
   h += '<input id="new-category-input" placeholder="Nouvelle catégorie" style="flex:1;"/>'
   h += '<button class="btn small" data-action="add-category">+</button>'
   h += '</div>'
+  h += '</div>'
+
+  // === LOGOUT ===
+  h += '<div class="card">'
+  h += '<button class="btn danger-outline block" data-action="logout">Se déconnecter</button>'
   h += '</div>'
 
   h += '</section>'
@@ -807,7 +919,12 @@ function bindEvents() {
 }
 
 function handleAction(action, el) {
-  if (action === 'open-edit-profile') {
+  if (action === 'logout') {
+    logout()
+    state.user = null
+    state.authMode = 'login'
+    render()
+  } else if (action === 'open-edit-profile') {
     state.modal = { type: 'edit-profile' }
     render()
   } else if (action === 'view-ing') {
