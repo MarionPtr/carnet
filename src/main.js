@@ -361,23 +361,25 @@ function renderProfile() {
   h += '<section>'
 
   // === SECTION PROFIL ===
-  h += '<div class="card">'
-  h += '<h3 style="margin:0 0 12px;font-size:15px;">Informations</h3>'
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'
-  h += '<div><div class="sub" style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Poids</div><div style="font-size:16px;font-weight:600;">' + p.weight + ' kg</div></div>'
-  h += '<div><div class="sub" style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Taille</div><div style="font-size:16px;font-weight:600;">' + p.height + ' cm</div></div>'
-  h += '<div><div class="sub" style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Âge</div><div style="font-size:16px;font-weight:600;">' + p.age + ' ans</div></div>'
-  h += '<div><div class="sub" style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Sexe</div><div style="font-size:16px;font-weight:600;">' + (p.sex === 'f' ? 'Femme' : 'Homme') + '</div></div>'
-  h += '</div>'
-
   const activityLabels = { 1.2: 'Sédentaire', 1.375: 'Légère', 1.55: 'Modérée', 1.725: 'Active', 1.9: 'Très active' }
   const goalLabels = { cut: 'Sèche', maintain: 'Maintien', bulk: 'Prise de masse' }
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'
-  h += '<div><div class="sub" style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Activité</div><div style="font-size:14px;font-weight:600;">' + activityLabels[p.activity] + '</div></div>'
-  h += '<div><div class="sub" style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Objectif</div><div style="font-size:14px;font-weight:600;">' + goalLabels[p.goal] + '</div></div>'
+
+  h += '<div class="card">'
+  h += '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">'
+  h += '<div style="width:56px;height:56px;border-radius:50%;background:var(--surface-raised);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;">👤</div>'
+  h += '<div>'
+  h += '<div style="font-size:17px;font-weight:600;">' + esc(p.display_name || 'Sans nom') + '</div>'
+  h += '<div style="font-size:13px;color:var(--text-muted);margin-top:2px;">' + p.age + ' ans</div>'
+  h += '</div>'
   h += '</div>'
 
-  h += '<button class="btn primary block" data-action="open-edit-profile">Modifier</button>'
+  h += '<div style="border-top:1px solid var(--border);margin-bottom:4px;"></div>'
+
+  h += '<div class="list-item"><span>Poids actuel</span><span style="font-weight:600;">' + p.weight + ' kg</span></div>'
+  h += '<div class="list-item"><span>Activité</span><span style="font-weight:600;">' + activityLabels[p.activity] + '</span></div>'
+  h += '<div class="list-item"><span>Objectif</span><span style="font-weight:600;">' + goalLabels[p.goal] + '</span></div>'
+
+  h += '<button class="btn primary block" data-action="open-edit-profile" style="margin-top:16px;">Modifier</button>'
   h += '</div>'
 
   // === SECTION OBJECTIFS ===
