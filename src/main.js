@@ -21,6 +21,8 @@ import {
   round,
   clamp,
   todayStr,
+  parseLocalDate,
+  addDays,
   computeTargets,
   recipeMacrosPerServing,
   dayTotals,
@@ -57,6 +59,7 @@ const state = {
   recipes: [],
   profile: null,
   logs: [],
+  currentDate: todayStr(),
   modal: null,
   toastMsg: null,
   ingSearch: '',
@@ -94,12 +97,19 @@ async function init() {
     state.ingredients = await loadIngredients()
     state.recipes = await loadRecipes()
     state.profile = await loadProfile(state.currentPerson)
-    state.logs = await loadLogs(todayStr(), state.currentPerson)
+    state.logs = await loadLogs(state.currentDate, state.currentPerson)
     state.categories = await loadCategories()
   } catch (e) {
     console.error('Erreur lors du chargement:', e)
   }
   state.ready = true
+  render()
+}
+
+// Change le jour affiché dans le journal et recharge ses logs
+async function changeDate(newDate) {
+  state.currentDate = newDate
+  state.logs = await loadLogs(state.currentDate, state.currentPerson)
   render()
 }
 
@@ -232,7 +242,14 @@ function renderToday() {
   const totals = dayTotals(state.logs)
   const pct = clamp(totals.kcal / Math.max(1, targets.kcal), 0, 1)
 
-  let h = '<header class="top"><p class="eyebrow">Aujourd\'hui</p><h1>' + formatDateFR(new Date()) + '</h1></header>'
+  const isToday = state.currentDate === todayStr()
+  let h = '<header class="top"><p class="eyebrow">Journal</p>'
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+  h += '<button class="icon-btn" data-action="prev-day" style="font-size:22px;padding:4px 10px;flex-shrink:0;">‹</button>'
+  h += '<h1 data-action="open-date-picker" style="cursor:pointer;text-align:center;flex:1;">' + (isToday ? 'Aujourd\'hui' : formatDateFR(parseLocalDate(state.currentDate))) + '</h1>'
+  h += '<button class="icon-btn" data-action="next-day" style="font-size:22px;padding:4px 10px;flex-shrink:0;">›</button>'
+  h += '</div>'
+  h += '</header>'
   h += '<section>'
   h += '<div class="card">'
   h += '<div class="kcal-hero"><span class="num">' + round(totals.kcal) + ' <span style="font-size:16px;color:var(--text-muted);font-weight:400;">kcal</span></span><span class="target">objectif ' + targets.kcal + '</span></div>'
@@ -242,7 +259,7 @@ function renderToday() {
   h += macroRow('Lipides', totals.fat, targets.fat, 'var(--fat)')
   h += '</div>'
   h += '<div class="row2" style="margin-bottom:12px;"><button class="btn primary block" data-action="open-add-log">+ Ajouter au journal</button></div>'
-  h += '<div class="card"><h3 style="margin:0 0 8px;font-size:15px;">Journal du jour</h3>'
+  h += '<div class="card"><h3 style="margin:0 0 8px;font-size:15px;">' + (isToday ? 'Journal du jour' : 'Journal du ' + formatDateFR(parseLocalDate(state.currentDate))) + '</h3>'
 
   if (state.logs.length === 0) {
     h += '<div class="empty">Rien de mangé pour l\'instant. Ajoute une recette ou un ingrédient.</div>'
@@ -265,6 +282,13 @@ function renderToday() {
 function macroRow(label, val, target, color) {
   const pct = clamp(val / Math.max(1, target), 0, 1)
   return `<div class="macro-row"><span class="label">${label}</span><div class="bar-track"><div class="bar-fill" style="width:${pct * 100}%;background:${color}"></div></div><span class="amt">${round(val)} / ${round(target)}g</span></div>`
+}
+
+function datePickerForm() {
+  let h = '<h2>Choisir une date</h2>'
+  h += '<label class="field"><input type="date" id="date-picker-input" value="' + state.currentDate + '"/></label>'
+  h += '<button class="btn primary block" data-action="confirm-date-pick">Valider</button>'
+  return h
 }
 
 // ========== INGREDIENTS ==========
@@ -453,7 +477,7 @@ function tabIcon(name) {
 
 function renderTabs() {
   const tabs = [
-    ['today', 'Aujourd\'hui'],
+    ['today', 'Journal'],
     ['ingredients', 'Ingrédients'],
     ['recipes', 'Recettes'],
     ['profile', 'Profil']
@@ -477,6 +501,7 @@ function renderModal() {
   else if (m.type === 'ing-detail') body = ingredientDetailModal(m.ingId)
   else if (m.type === 'edit-profile') body = editProfileForm()
   else if (m.type === 'edit-category') body = editCategoryForm(m.categoryIdx)
+  else if (m.type === 'date-picker') body = datePickerForm()
 
   return (
     '<div class="modal-backdrop" data-action="close-modal-bg">' +
@@ -970,7 +995,20 @@ function bindEvents() {
 }
 
 function handleAction(action, el) {
-  if (action === 'logout') {
+  if (action === 'prev-day') {
+    changeDate(addDays(state.currentDate, -1))
+  } else if (action === 'next-day') {
+    changeDate(addDays(state.currentDate, 1))
+  } else if (action === 'open-date-picker') {
+    state.modal = { type: 'date-picker' }
+    render()
+  } else if (action === 'confirm-date-pick') {
+    const picked = document.getElementById('date-picker-input').value
+    if (picked) {
+      state.modal = null
+      changeDate(picked)
+    }
+  } else if (action === 'logout') {
     localStorage.removeItem(AUTH_STORAGE_KEY)
     localStorage.removeItem(PERSON_STORAGE_KEY)
     state.authenticated = false
@@ -1245,7 +1283,7 @@ function logRecipe(recipeId, servings) {
   const m = recipeMacrosPerServing(r, state.ingredients)
   const entry = {
     id: uid(),
-    log_date: todayStr(),
+    log_date: state.currentDate,
     person_id: state.currentPerson,
     kind: 'recipe',
     ref_id: r.id,
@@ -1266,7 +1304,7 @@ function logIngredient(ingId, grams) {
   const f = grams / 100
   const entry = {
     id: uid(),
-    log_date: todayStr(),
+    log_date: state.currentDate,
     person_id: state.currentPerson,
     kind: 'ingredient',
     ref_id: i.id,

@@ -14,6 +14,22 @@ export function todayStr() {
   return d.toISOString().slice(0, 10)
 }
 
+// Parse une date "YYYY-MM-DD" en objet Date local (évite les décalages UTC)
+export function parseLocalDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+// Ajoute (ou retire) des jours à une date "YYYY-MM-DD", retourne une "YYYY-MM-DD"
+export function addDays(dateStr, delta) {
+  const d = parseLocalDate(dateStr)
+  d.setDate(d.getDate() + delta)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 // Calcul des objectifs de macros (Mifflin-St Jeor)
 export function computeTargets(profile) {
   if (profile.use_custom) {
