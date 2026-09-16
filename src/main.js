@@ -364,8 +364,11 @@ function renderIngredients() {
     h += '<button class="icon-btn" data-action="clear-ing-search" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:var(--text-h3);">✕</button>'
   }
   h += '</div>'
-  h += '<button data-action="open-ing-filter" style="flex-shrink:0;width:44px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:' + (isFilterActive ? 'var(--protein)' : 'var(--surface-raised)') + ';color:' + (isFilterActive ? '#221705' : 'var(--text)') + ';border:1px solid var(--border-strong);cursor:pointer;">'
+  h += '<button data-action="open-ing-filter" style="position:relative;flex-shrink:0;width:44px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:var(--surface-raised);color:var(--text);border:1px solid var(--border-strong);cursor:pointer;">'
   h += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="17" x2="14" y2="17"/></svg>'
+  if (isFilterActive) {
+    h += '<span style="position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--protein);"></span>'
+  }
   h += '</button>'
   h += '</div>'
 
