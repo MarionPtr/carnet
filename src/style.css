@@ -52,7 +52,7 @@ h1,h2,h3,.serif{ font-family:'Fraunces', serif; }
 
 #app{ max-width:480px; margin:0 auto; min-height:100vh; min-height:100dvh; position:relative; padding-bottom:78px; }
 
-header.top{ padding:22px 18px 10px; }
+header.top{ padding:calc(22px + env(safe-area-inset-top)) 18px 10px; }
 header.top .eyebrow{ color:var(--text-muted); font-size:13px; margin:0 0 2px; }
 header.top h1{ font-size:26px; font-weight:600; margin:0; letter-spacing:-0.01em; }
 
