@@ -436,9 +436,9 @@ function renderProfile() {
 
   h += '<div style="border-top:1px solid var(--border);margin-bottom:4px;"></div>'
 
-  h += '<div class="list-item"><span>Poids actuel</span><span style="font-weight:600;">' + p.weight + ' kg</span></div>'
-  h += '<div class="list-item"><span>Activité</span><span style="font-weight:600;">' + activityLabels[p.activity] + '</span></div>'
-  h += '<div class="list-item"><span>Objectif</span><span style="font-weight:600;">' + goalLabels[p.goal] + '</span></div>'
+  h += '<div class="list-item" style="font-size:var(--text-small);"><span>Poids actuel</span><span style="font-weight:600;">' + p.weight + ' kg</span></div>'
+  h += '<div class="list-item" style="font-size:var(--text-small);"><span>Activité</span><span style="font-weight:600;">' + activityLabels[p.activity] + '</span></div>'
+  h += '<div class="list-item" style="font-size:var(--text-small);"><span>Objectif</span><span style="font-weight:600;">' + goalLabels[p.goal] + '</span></div>'
 
   h += '<button class="btn primary block" data-action="open-edit-profile" style="margin-top:16px;">Modifier</button>'
   h += '</div>'
