@@ -64,6 +64,8 @@ const state = {
   toastMsg: null,
   ingSearch: '',
   collapsedCategories: {},
+  ingViewMode: 'category', // 'category' ou 'alphabetical'
+  ingVisibleCategories: null, // null = toutes visibles, sinon tableau de catégories cochées
   logType: 'recipe',
   _draftIngredient: null,
   _draftRecipe: null,
@@ -354,18 +356,44 @@ function renderIngredients() {
   h += '<button data-action="open-add-ing" style="width:40px;height:40px;flex-shrink:0;padding:0;line-height:1;border-radius:50%;background:var(--protein);color:#221705;border:none;font-size:22px;font-weight:500;display:flex;align-items:center;justify-content:center;cursor:pointer;">+</button>'
   h += '</header>'
   h += '<section>'
-  h += '<div class="search-wrap" style="position:relative;">'
+  const isFilterActive = state.ingViewMode === 'alphabetical' || (state.ingVisibleCategories !== null)
+  h += '<div style="display:flex;gap:8px;">'
+  h += '<div class="search-wrap" style="position:relative;flex:1;margin-bottom:0;">'
   h += '<input placeholder="Rechercher…" id="ing-search" value="' + esc(state.ingSearch) + '" style="' + (state.ingSearch ? 'padding-right:36px;' : '') + '"/>'
   if (state.ingSearch) {
     h += '<button class="icon-btn" data-action="clear-ing-search" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:var(--text-h3);">✕</button>'
   }
   h += '</div>'
+  h += '<button data-action="open-ing-filter" style="flex-shrink:0;width:44px;border-radius:9px;background:' + (isFilterActive ? 'var(--protein)' : 'var(--surface-raised)') + ';color:' + (isFilterActive ? '#221705' : 'var(--text)') + ';border:1px solid var(--border-strong);font-size:16px;cursor:pointer;">☰</button>'
+  h += '</div>'
+
+  const useAlphabetical = state.ingViewMode === 'alphabetical'
+  const alphaList = filtered.slice().sort((a, b) => a.name.localeCompare(b.name))
 
   if (filtered.length === 0) {
     h += '<div class="empty">Aucun ingrédient. Ajoute-en un pour commencer.</div>'
+  } else if (useAlphabetical) {
+    h += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;">'
+    alphaList.forEach((i, idx) => {
+      h += '<div class="list-item" style="cursor:pointer;padding:10px 12px;border-bottom:' + (idx < alphaList.length - 1 ? '1px solid var(--border)' : 'none') + ';" data-action="view-ing" data-id="' + i.id + '">'
+      h += '<div style="width:56px;height:56px;flex-shrink:0;border-radius:10px;overflow:hidden;margin-right:12px;background:var(--surface-raised);border:1px solid var(--border);">'
+      if (i.photo) {
+        h += '<img src="' + i.photo + '" style="width:100%;height:100%;object-fit:cover;"/>'
+      } else {
+        h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h2);">🥘</div>'
+      }
+      h += '</div>'
+      h += '<div style="flex:1;"><div class="name" style="font-size:var(--text-h3);font-weight:600;">' + esc(i.name) + '</div></div>'
+      h += '<div style="color:var(--text-muted);font-size:28px;line-height:1;flex-shrink:0;padding-left:6px;">›</div>'
+      h += '</div>'
+    })
+    h += '</div>'
   } else {
-    categories.forEach(cat => {
-      const isCollapsed = !!state.collapsedCategories[cat]
+    const visibleCategories = state.ingVisibleCategories === null
+      ? categories
+      : categories.filter(cat => state.ingVisibleCategories.includes(cat))
+    visibleCategories.forEach(cat => {
+      const isCollapsed = state.collapsedCategories[cat] !== false
       h += '<div data-action="toggle-category" data-cat="' + esc(cat) + '" style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px;cursor:pointer;">'
       h += '<h4 style="font-size:var(--text-h3);font-weight:700;margin:0;">' + esc(cat) + '</h4>'
       h += '<span style="color:var(--text-muted);font-size:22px;font-weight:700;display:inline-block;padding:4px;transform:rotate(' + (isCollapsed ? '-90deg' : '0deg') + ');transition:transform .15s ease;">▾</span>'
@@ -393,6 +421,28 @@ function renderIngredients() {
   }
 
   h += '</section>'
+  return h
+}
+
+function ingFilterForm() {
+  const mode = state.ingViewMode
+  let h = '<h2>Affichage</h2>'
+  h += '<div class="segmented" style="margin-bottom:20px;">'
+  h += '<button type="button" class="' + (mode === 'category' ? 'active' : '') + '" data-action="set-ing-view-mode" data-mode="category">Par catégorie</button>'
+  h += '<button type="button" class="' + (mode === 'alphabetical' ? 'active' : '') + '" data-action="set-ing-view-mode" data-mode="alphabetical">Liste alphabétique</button>'
+  h += '</div>'
+
+  if (mode === 'category') {
+    h += '<span class="lbl" style="display:block;margin-bottom:10px;">Catégories visibles</span>'
+    state.categories.forEach(cat => {
+      const checked = state.ingVisibleCategories === null || state.ingVisibleCategories.includes(cat)
+      h += '<label class="list-item" style="cursor:pointer;">'
+      h += '<span>' + esc(cat) + '</span>'
+      h += '<input type="checkbox" data-action="toggle-ing-visible-category" data-cat="' + esc(cat) + '" style="width:auto;" ' + (checked ? 'checked' : '') + '/>'
+      h += '</label>'
+    })
+  }
+
   return h
 }
 
@@ -556,6 +606,7 @@ function renderModal() {
   else if (m.type === 'edit-category') body = editCategoryForm(m.categoryIdx)
   else if (m.type === 'date-picker') body = datePickerForm()
   else if (m.type === 'settings') body = settingsForm()
+  else if (m.type === 'ing-filter') body = ingFilterForm()
 
   return (
     '<div class="modal-backdrop" data-action="close-modal-bg">' +
@@ -1042,7 +1093,27 @@ function handleAction(action, el) {
     render()
   } else if (action === 'toggle-category') {
     const cat = el.getAttribute('data-cat')
-    state.collapsedCategories[cat] = !state.collapsedCategories[cat]
+    const currentlyCollapsed = state.collapsedCategories[cat] !== false
+    state.collapsedCategories[cat] = !currentlyCollapsed
+    render()
+  } else if (action === 'open-ing-filter') {
+    state.modal = { type: 'ing-filter' }
+    render()
+  } else if (action === 'set-ing-view-mode') {
+    state.ingViewMode = el.getAttribute('data-mode')
+    render()
+  } else if (action === 'toggle-ing-visible-category') {
+    const cat = el.getAttribute('data-cat')
+    if (state.ingVisibleCategories === null) {
+      state.ingVisibleCategories = state.categories.filter(c => c !== cat)
+    } else if (el.checked) {
+      if (!state.ingVisibleCategories.includes(cat)) state.ingVisibleCategories.push(cat)
+    } else {
+      state.ingVisibleCategories = state.ingVisibleCategories.filter(c => c !== cat)
+    }
+    if (state.ingVisibleCategories.length === state.categories.length) {
+      state.ingVisibleCategories = null
+    }
     render()
   } else if (action === 'prev-day') {
     changeDate(addDays(state.currentDate, -1))
