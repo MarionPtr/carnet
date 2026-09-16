@@ -118,7 +118,9 @@ export function formatDateFR(d) {
     'novembre',
     'décembre'
   ]
-  return `${jours[d.getDay()]} ${d.getDate()} ${mois[d.getMonth()]}`
+  const jour = jours[d.getDay()]
+  const jourCapitalized = jour.charAt(0).toUpperCase() + jour.slice(1)
+  return `${jourCapitalized} ${d.getDate()} ${mois[d.getMonth()]}`
 }
 
 // Échappement HTML
