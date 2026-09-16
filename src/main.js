@@ -23,6 +23,7 @@ import {
   todayStr,
   parseLocalDate,
   addDays,
+  calculateAge,
   computeTargets,
   recipeMacrosPerServing,
   dayTotals,
@@ -498,7 +499,7 @@ function renderProfile() {
   h += '<div style="width:56px;height:56px;border-radius:50%;background:var(--surface-raised);display:flex;align-items:center;justify-content:center;font-size:var(--text-h1);flex-shrink:0;">👤</div>'
   h += '<div>'
   h += '<div style="font-size:var(--text-h3);font-weight:600;">' + esc(p.display_name || 'Sans nom') + '</div>'
-  h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + p.age + ' ans</div>'
+  h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + (calculateAge(p.birthdate) ?? p.age) + ' ans</div>'
   h += '</div>'
   h += '</div>'
 
@@ -826,7 +827,7 @@ function editProfileForm() {
   h += '<label class="field"><span class="lbl">Taille (cm)</span><input type="number" id="p-height" value="' + p.height + '"/></label>'
   h += '</div>'
   h += '<div class="row2">'
-  h += '<label class="field"><span class="lbl">Âge</span><input type="number" id="p-age" value="' + p.age + '"/></label>'
+  h += '<label class="field"><span class="lbl">Date de naissance</span><input type="date" id="p-birthdate" value="' + (p.birthdate || '') + '"/></label>'
   h += '<label class="field"><span class="lbl">Sexe</span><select id="p-sex"><option value="f" ' + (p.sex === 'f' ? 'selected' : '') + '>Femme</option><option value="m" ' + (p.sex === 'm' ? 'selected' : '') + '>Homme</option></select></label>'
   h += '</div>'
   h += '<label class="field"><span class="lbl">Activité</span><select id="p-activity">'
@@ -1025,7 +1026,7 @@ function bindEvents() {
     { id: 'p-display-name', field: 'display_name', type: 'string' },
     { id: 'p-weight', field: 'weight', type: 'float' },
     { id: 'p-height', field: 'height', type: 'float' },
-    { id: 'p-age', field: 'age', type: 'int' },
+    { id: 'p-birthdate', field: 'birthdate', type: 'string' },
     { id: 'p-sex', field: 'sex', type: 'string' },
     { id: 'p-activity', field: 'activity', type: 'float' },
     { id: 'p-custom', field: 'use_custom', type: 'bool' },
@@ -1413,7 +1414,7 @@ function handleAction(action, el) {
     const p = state.profile
     p.weight = parseFloat(document.getElementById('p-weight').value) || p.weight
     p.height = parseFloat(document.getElementById('p-height').value) || p.height
-    p.age = parseInt(document.getElementById('p-age').value) || p.age
+    p.birthdate = document.getElementById('p-birthdate').value || p.birthdate
     p.sex = document.getElementById('p-sex').value
     p.activity = parseFloat(document.getElementById('p-activity').value)
     saveProfile(p)

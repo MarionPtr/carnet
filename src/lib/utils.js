@@ -20,6 +20,19 @@ export function parseLocalDate(dateStr) {
   return new Date(y, m - 1, d)
 }
 
+// Calcule l'âge en années révolues à partir d'une date de naissance "YYYY-MM-DD"
+export function calculateAge(birthdate) {
+  if (!birthdate) return null
+  const birth = parseLocalDate(birthdate)
+  const today = new Date()
+  let age = today.getFullYear() - birth.getFullYear()
+  const hasHadBirthdayThisYear =
+    today.getMonth() > birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate())
+  if (!hasHadBirthdayThisYear) age--
+  return age
+}
+
 // Ajoute (ou retire) des jours à une date "YYYY-MM-DD", retourne une "YYYY-MM-DD"
 export function addDays(dateStr, delta) {
   const d = parseLocalDate(dateStr)
@@ -41,10 +54,11 @@ export function computeTargets(profile) {
     }
   }
 
+  const age = calculateAge(profile.birthdate) ?? profile.age
   const bmr =
     profile.sex === 'm'
-      ? 10 * profile.weight + 6.25 * profile.height - 5 * profile.age + 5
-      : 10 * profile.weight + 6.25 * profile.height - 5 * profile.age - 161
+      ? 10 * profile.weight + 6.25 * profile.height - 5 * age + 5
+      : 10 * profile.weight + 6.25 * profile.height - 5 * age - 161
 
   const tdee = bmr * profile.activity
   const kcal =
