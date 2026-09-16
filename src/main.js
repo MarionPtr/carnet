@@ -67,6 +67,8 @@ const state = {
   ingViewMode: 'category', // 'category' ou 'alphabetical'
   ingVisibleCategories: null, // null = toutes visibles, sinon tableau de catégories cochées
   logType: 'recipe',
+  logIngId: null,
+  logGramsMode: 'custom', // 'custom' ou 'portion'
   _draftIngredient: null,
   _draftRecipe: null,
   categories: []
@@ -627,7 +629,7 @@ function renderModal() {
 function ingredientForm(editId) {
   const ing = editId
     ? state.ingredients.find(i => i.id === editId)
-    : { name: '', kcal: '', protein: '', carbs: '', fat: '', fiber: '', sugar: '', salt: '', brands: [], photo: '', serving_size: '' }
+    : { name: '', kcal: '', protein: '', carbs: '', fat: '', fiber: '', sugar: '', salt: '', brands: [], photo: '', serving_size: '', serving_size_grams: '' }
 
   if (!state._draftIngredient) {
     state._draftIngredient = { ...ing }
@@ -676,7 +678,10 @@ function ingredientForm(editId) {
   h += '</div>'
   h += '</label>'
 
-  h += '<label class="field"><span class="lbl">Portion type</span><input id="f-serving-size" value="' + esc(draft.serving_size || '') + '" placeholder="ex. 100g, 1 pomme, 1 verre"/></label>'
+  h += '<div class="row2">'
+  h += '<label class="field"><span class="lbl">Nom de la portion</span><input id="f-serving-size" value="' + esc(draft.serving_size || '') + '" placeholder="ex. 1 yaourt, 1 tranche"/></label>'
+  h += '<label class="field"><span class="lbl">Poids (g)</span><input type="number" id="f-serving-size-grams" value="' + (draft.serving_size_grams || '') + '" placeholder="ex. 125"/></label>'
+  h += '</div>'
 
   h += '<label class="field"><span class="lbl">Calories (kcal)</span><input type="number" id="f-kcal" value="' + (draft.kcal || '') + '"/></label>'
   h += '<div class="row2">'
@@ -774,12 +779,27 @@ function addLogForm() {
     if (state.ingredients.length === 0) {
       h += '<div class="empty">Aucun ingrédient pour l\'instant.</div>'
     } else {
+      if (!state.logIngId || !state.ingredients.find(i => i.id === state.logIngId)) {
+        state.logIngId = state.ingredients[0].id
+      }
+      const selectedIng = state.ingredients.find(i => i.id === state.logIngId)
       h += '<label class="field"><span class="lbl">Ingrédient</span><select id="log-ing">'
       state.ingredients.forEach(i => {
-        h += '<option value="' + i.id + '">' + esc(i.name) + '</option>'
+        h += '<option value="' + i.id + '" ' + (i.id === state.logIngId ? 'selected' : '') + '>' + esc(i.name) + '</option>'
       })
       h += '</select></label>'
-      h += '<label class="field"><span class="lbl">Quantité (g)</span><input type="number" id="log-grams" value="100"/></label>'
+
+      if (selectedIng && selectedIng.serving_size_grams) {
+        h += '<div class="segmented" style="margin-bottom:10px;">'
+        h += '<button type="button" class="' + (state.logGramsMode !== 'portion' ? 'active' : '') + '" data-action="set-log-grams-mode" data-mode="custom">Grammes</button>'
+        h += '<button type="button" class="' + (state.logGramsMode === 'portion' ? 'active' : '') + '" data-action="set-log-grams-mode" data-mode="portion">1 portion (' + selectedIng.serving_size_grams + 'g)</button>'
+        h += '</div>'
+      }
+
+      const gramsValue = (selectedIng && selectedIng.serving_size_grams && state.logGramsMode === 'portion')
+        ? selectedIng.serving_size_grams
+        : 100
+      h += '<label class="field"><span class="lbl">Quantité (g)</span><input type="number" id="log-grams" value="' + gramsValue + '" ' + (state.logGramsMode === 'portion' ? 'readonly' : '') + '/></label>'
       h += '<button class="btn primary block" data-action="confirm-log-ing">Ajouter</button>'
     }
   }
@@ -872,8 +892,11 @@ function ingredientDetailModal(ingId) {
   h += '<h2 style="margin:0 0 4px;">' + esc(ing.name) + '</h2>'
 
   // Serving size
-  if (ing.serving_size) {
-    h += '<div style="color:var(--text-muted);font-size:var(--text-small);margin-bottom:12px;font-weight:500;">Portion : ' + esc(ing.serving_size) + '</div>'
+  if (ing.serving_size || ing.serving_size_grams) {
+    let label = 'Portion : '
+    if (ing.serving_size) label += esc(ing.serving_size)
+    if (ing.serving_size_grams) label += (ing.serving_size ? ' ' : '') + '(' + ing.serving_size_grams + 'g)'
+    h += '<div style="color:var(--text-muted);font-size:var(--text-small);margin-bottom:12px;font-weight:500;">' + label + '</div>'
   }
 
   // Category + Brands
@@ -884,29 +907,40 @@ function ingredientDetailModal(ingId) {
     h += '<div style="color:var(--text-muted);font-size:var(--text-small);margin-bottom:16px;">' + ing.brands.join(', ') + '</div>'
   }
 
+  // Toggle 100g / portion
+  const showPortion = !!ing.serving_size_grams && state._ingDetailMode === 'portion'
+  const factor = showPortion ? ing.serving_size_grams / 100 : 1
+
+  if (ing.serving_size_grams) {
+    h += '<div class="segmented" style="margin-bottom:12px;">'
+    h += '<button type="button" class="' + (!showPortion ? 'active' : '') + '" data-action="set-ing-detail-mode" data-mode="100g">Pour 100g</button>'
+    h += '<button type="button" class="' + (showPortion ? 'active' : '') + '" data-action="set-ing-detail-mode" data-mode="portion">Pour 1 portion</button>'
+    h += '</div>'
+  }
+
   // Macros en listing (style étiquette)
   h += '<div class="card" style="background:var(--surface-raised);padding:14px;margin-bottom:16px;">'
-  h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Valeurs nutritionnelles pour 100g / 100ml</div>'
+  h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Valeurs nutritionnelles ' + (showPortion ? 'pour la portion (' + ing.serving_size_grams + 'g)' : 'pour 100g / 100ml') + '</div>'
 
   // Ligne principale : kcal
   h += '<div style="border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:10px;">'
   h += '<div style="display:flex;justify-content:space-between;align-items:center;">'
   h += '<div style="font-size:var(--text-small);">Énergie</div>'
-  h += '<div style="font-size:var(--text-h2);font-weight:700;">' + round(ing.kcal) + ' <span style="font-size:var(--text-small);">kcal</span></div>'
+  h += '<div style="font-size:var(--text-h2);font-weight:700;">' + round(ing.kcal * factor) + ' <span style="font-size:var(--text-small);">kcal</span></div>'
   h += '</div></div>'
 
   // Macros principales
   h += '<div style="display:flex;flex-direction:column;gap:10px;">'
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Protéines</div><div style="font-weight:600;color:var(--protein);font-size:var(--text-h3);">' + round(ing.protein) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Glucides</div><div style="font-weight:600;color:var(--carbs);font-size:var(--text-h3);">' + round(ing.carbs) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Lipides</div><div style="font-weight:600;color:var(--fat);font-size:var(--text-h3);">' + round(ing.fat) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Protéines</div><div style="font-weight:600;color:var(--protein);font-size:var(--text-h3);">' + round(ing.protein * factor) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Glucides</div><div style="font-weight:600;color:var(--carbs);font-size:var(--text-h3);">' + round(ing.carbs * factor) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Lipides</div><div style="font-weight:600;color:var(--fat);font-size:var(--text-h3);">' + round(ing.fat * factor) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
 
   // Détails supplémentaires
   if (ing.fiber || ing.sugar || ing.salt) {
     h += '<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px;">'
-    if (ing.fiber) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);margin-bottom:6px;"><div>Fibres</div><div style="font-weight:500;">' + round(ing.fiber) + ' g</div></div>'
-    if (ing.sugar) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);margin-bottom:6px;"><div>Sucres</div><div style="font-weight:500;">' + round(ing.sugar) + ' g</div></div>'
-    if (ing.salt) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);"><div>Sel</div><div style="font-weight:500;">' + round(ing.salt) + ' g</div></div>'
+    if (ing.fiber) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);margin-bottom:6px;"><div>Fibres</div><div style="font-weight:500;">' + round(ing.fiber * factor) + ' g</div></div>'
+    if (ing.sugar) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);margin-bottom:6px;"><div>Sucres</div><div style="font-weight:500;">' + round(ing.sugar * factor) + ' g</div></div>'
+    if (ing.salt) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);"><div>Sel</div><div style="font-weight:500;">' + round(ing.salt * factor) + ' g</div></div>'
     h += '</div>'
   }
 
@@ -1031,6 +1065,16 @@ function bindEvents() {
       render()
     })
   })
+
+  // Log ingredient select - refresh to show/hide the portion shortcut
+  const logIngSelect = document.getElementById('log-ing')
+  if (logIngSelect) {
+    logIngSelect.addEventListener('change', () => {
+      state.logIngId = logIngSelect.value
+      state.logGramsMode = 'custom'
+      render()
+    })
+  }
 
   // Recipe item fields
   app.querySelectorAll('[data-ridx]').forEach(inp => {
@@ -1172,7 +1216,11 @@ function handleAction(action, el) {
     state.modal = { type: 'settings' }
     render()
   } else if (action === 'view-ing') {
+    state._ingDetailMode = '100g'
     state.modal = { type: 'ing-detail', ingId: el.getAttribute('data-id') }
+    render()
+  } else if (action === 'set-ing-detail-mode') {
+    state._ingDetailMode = el.getAttribute('data-mode')
     render()
   } else if (action === 'open-add-ing') {
     state._draftIngredient = null
@@ -1241,6 +1289,7 @@ function handleAction(action, el) {
         name,
         category: category,
         serving_size: document.getElementById('f-serving-size').value.trim(),
+        serving_size_grams: parseFloat(document.getElementById('f-serving-size-grams').value) || null,
         kcal: parseFloat(document.getElementById('f-kcal').value) || 0,
         protein: parseFloat(document.getElementById('f-protein').value) || 0,
         carbs: parseFloat(document.getElementById('f-carbs').value) || 0,
@@ -1315,8 +1364,13 @@ function handleAction(action, el) {
     const rid2 = el.getAttribute('data-id')
     logRecipe(rid2, 1)
     showToast('Ajouté au journal')
+  } else if (action === 'set-log-grams-mode') {
+    state.logGramsMode = el.getAttribute('data-mode')
+    render()
   } else if (action === 'open-add-log') {
     state.logType = 'recipe'
+    state.logIngId = null
+    state.logGramsMode = 'custom'
     state.modal = { type: 'add-log' }
     render()
   } else if (action === 'confirm-log-recipe') {
