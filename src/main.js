@@ -246,7 +246,7 @@ function renderToday() {
   const pct = clamp(totals.kcal / Math.max(1, targets.kcal), 0, 1)
 
   const isToday = state.currentDate === todayStr()
-  let h = '<header class="top"><p class="eyebrow">Journal</p>'
+  let h = '<header class="top">'
   h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
   h += '<button class="icon-btn" data-action="prev-day" style="font-size:var(--text-h2);padding:4px 10px;flex-shrink:0;">‹</button>'
   h += '<h1 data-action="open-date-picker" style="cursor:pointer;text-align:center;flex:1;">' + (isToday ? 'Aujourd\'hui' : formatDateFR(parseLocalDate(state.currentDate))) + '</h1>'
@@ -314,7 +314,7 @@ function renderIngredients() {
 
   const categories = Object.keys(grouped).sort()
 
-  let h = '<header class="top"><p class="eyebrow">Garde-manger</p><h1>Ingrédients</h1></header>'
+  let h = '<header class="top"><h1>Ingrédients</h1></header>'
   h += '<section>'
   h += '<div class="search-wrap"><input placeholder="Rechercher…" id="ing-search" value="' + esc(state.ingSearch) + '"/></div>'
   h += '<button class="btn primary block" data-action="open-add-ing" style="margin-bottom:14px;">+ Nouvel ingrédient</button>'
@@ -355,7 +355,7 @@ function renderIngredients() {
 
 // ========== RECIPES ==========
 function renderRecipes() {
-  let h = '<header class="top"><p class="eyebrow">Livre de recettes</p><h1>Recettes</h1></header>'
+  let h = '<header class="top"><h1>Recettes</h1></header>'
   h += '<section>'
   h += '<button class="btn primary block" data-action="open-add-recipe" style="margin-bottom:14px;">+ Nouvelle recette</button>'
   h += '<div class="card">'
