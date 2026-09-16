@@ -1005,6 +1005,10 @@ function handleAction(action, el) {
   } else if (action === 'open-date-picker') {
     state.modal = { type: 'date-picker' }
     render()
+    const input = document.getElementById('date-picker-input')
+    if (input && input.showPicker) {
+      try { input.showPicker() } catch (e) {}
+    }
   } else if (action === 'confirm-date-pick') {
     const picked = document.getElementById('date-picker-input').value
     if (picked) {
