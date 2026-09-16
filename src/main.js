@@ -357,12 +357,12 @@ function renderProfile() {
   const p = state.profile
   const targets = computeTargets(p)
 
-  let h = '<header class="top"><p class="eyebrow">' + esc(p.display_name || 'Réglages') + '</p><h1>Profil</h1></header>'
+  let h = '<header class="top"><p class="eyebrow">Profil</p><h1>' + esc(p.display_name || 'Réglages') + '</h1></header>'
   h += '<section>'
 
   // === SECTION PROFIL ===
   h += '<div class="card">'
-  h += '<h3 style="margin:0 0 12px;font-size:15px;">Mon profil</h3>'
+  h += '<h3 style="margin:0 0 12px;font-size:15px;">Informations</h3>'
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'
   h += '<div><div class="sub" style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Poids</div><div style="font-size:16px;font-weight:600;">' + p.weight + ' kg</div></div>'
   h += '<div><div class="sub" style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Taille</div><div style="font-size:16px;font-weight:600;">' + p.height + ' cm</div></div>'
