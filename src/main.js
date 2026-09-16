@@ -368,7 +368,7 @@ function renderIngredients() {
       const isCollapsed = !!state.collapsedCategories[cat]
       h += '<div data-action="toggle-category" data-cat="' + esc(cat) + '" style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px;cursor:pointer;">'
       h += '<h4 style="font-size:var(--text-h3);font-weight:700;margin:0;">' + esc(cat) + '</h4>'
-      h += '<span style="color:var(--text-muted);font-size:var(--text-small);display:inline-block;transform:rotate(' + (isCollapsed ? '-90deg' : '0deg') + ');transition:transform .15s ease;">▾</span>'
+      h += '<span style="color:var(--text-muted);font-size:22px;font-weight:700;display:inline-block;padding:4px;transform:rotate(' + (isCollapsed ? '-90deg' : '0deg') + ');transition:transform .15s ease;">▾</span>'
       h += '</div>'
       if (!isCollapsed) {
         h += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;">'

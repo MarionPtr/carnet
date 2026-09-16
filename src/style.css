@@ -63,7 +63,7 @@ h2{ font-size:var(--text-h2); font-weight:700; }
 h3{ font-size:var(--text-h3); font-weight:600; }
 
 #app{ max-width:480px; margin:0 auto; min-height:100vh; min-height:100dvh; position:relative; }
-#app:has(nav.tabs){ padding-bottom:104px; }
+#app:has(nav.tabs){ padding-bottom:96px; }
 
 header.top{ padding:calc(22px + env(safe-area-inset-top)) 18px 10px; }
 header.top .eyebrow{ color:var(--text-muted); font-size:var(--text-small); margin:0 0 2px; }
@@ -131,7 +131,7 @@ label.field .lbl{ display:block; font-size:var(--text-small); color:var(--text-m
 .pill.fat{ background:rgba(201,122,102,0.16); color:var(--fat); }
 
 nav.tabs{
-  position:fixed; bottom:calc(14px + env(safe-area-inset-bottom)); left:14px; right:14px; z-index:10;
+  position:fixed; bottom:calc(6px + env(safe-area-inset-bottom)); left:14px; right:14px; z-index:10;
   background:var(--nav-bg); backdrop-filter:blur(14px);
   border:1px solid var(--border-strong);
   border-radius:999px;
