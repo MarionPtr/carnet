@@ -11,12 +11,7 @@ import {
   saveProfile,
   addLog,
   deleteLog,
-  uid,
-  signup,
-  login,
-  logout,
-  getSession,
-  onAuthStateChange
+  uid
 } from './lib/db'
 import {
   round,
@@ -29,9 +24,13 @@ import {
   esc
 } from './lib/utils'
 
+// Mot de passe d'accès à l'app
+const APP_PASSWORD = 'SkodaRouge12/'
+const AUTH_STORAGE_KEY = 'carnet_authenticated'
+
 // État global
 const state = {
-  user: null,
+  authenticated: false,
   tab: 'today',
   ready: false,
   ingredients: [],
@@ -44,17 +43,15 @@ const state = {
   logType: 'recipe',
   _draftIngredient: null,
   _draftRecipe: null,
-  categories: ['condiment', 'dessert', 'epice', 'feculent', 'fromage', 'fruit', 'legume', 'legumineuse', 'Proteine'],
-  authMode: 'login' // 'login' ou 'signup'
+  categories: ['condiment', 'dessert', 'epice', 'feculent', 'fromage', 'fruit', 'legume', 'legumineuse', 'Proteine']
 }
 
 // Initialisation
 async function init() {
-  // Vérifier la session
-  const { data: session } = await getSession()
-  state.user = session?.user || null
+  // Vérifier si déjà authentifié (stocké localement)
+  state.authenticated = localStorage.getItem(AUTH_STORAGE_KEY) === 'true'
 
-  if (!state.user) {
+  if (!state.authenticated) {
     state.ready = true
     render()
     return
@@ -86,8 +83,8 @@ function render() {
     return
   }
 
-  // Si pas connecté, afficher l'écran d'auth
-  if (!state.user) {
+  // Si pas authentifié, afficher l'écran de mot de passe
+  if (!state.authenticated) {
     app.innerHTML = renderAuth()
     bindAuthEvents()
     return
@@ -112,21 +109,8 @@ function renderAuth() {
   let h = '<div style="max-width:480px;margin:0 auto;padding:20px;min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;">'
   h += '<div style="width:100%;max-width:400px;">'
   h += '<h1 style="text-align:center;font-size:28px;margin-bottom:30px;font-family:Fraunces,serif;">Carnet</h1>'
-
-  if (state.authMode === 'login') {
-    h += '<h2 style="font-size:18px;margin-bottom:20px;">Connexion</h2>'
-    h += '<label class="field"><span class="lbl">Email</span><input id="auth-email" type="email" placeholder="ton@email.com"/></label>'
-    h += '<label class="field"><span class="lbl">Mot de passe</span><input id="auth-password" type="password" placeholder="••••••••"/></label>'
-    h += '<button class="btn primary block" data-action="auth-login">Se connecter</button>'
-    h += '<p style="text-align:center;margin-top:16px;font-size:13px;color:var(--text-muted);">Pas encore de compte ? <button class="btn" style="background:none;border:none;color:var(--protein);padding:0;cursor:pointer;" data-action="auth-toggle-signup">S\'inscrire</button></p>'
-  } else {
-    h += '<h2 style="font-size:18px;margin-bottom:20px;">Créer un compte</h2>'
-    h += '<label class="field"><span class="lbl">Email</span><input id="auth-email" type="email" placeholder="ton@email.com"/></label>'
-    h += '<label class="field"><span class="lbl">Mot de passe</span><input id="auth-password" type="password" placeholder="••••••••"/></label>'
-    h += '<button class="btn primary block" data-action="auth-signup">S\'inscrire</button>'
-    h += '<p style="text-align:center;margin-top:16px;font-size:13px;color:var(--text-muted);">Déjà un compte ? <button class="btn" style="background:none;border:none;color:var(--protein);padding:0;cursor:pointer;" data-action="auth-toggle-login">Se connecter</button></p>'
-  }
-
+  h += '<label class="field"><span class="lbl">Mot de passe</span><input id="auth-password" type="password" placeholder="••••••••"/></label>'
+  h += '<button class="btn primary block" data-action="auth-submit">Accéder</button>'
   h += '</div></div>'
   if (state.toastMsg) h += `<div class="toast">${esc(state.toastMsg)}</div>`
   return h
@@ -134,61 +118,37 @@ function renderAuth() {
 
 function bindAuthEvents() {
   const app = document.getElementById('app')
+  const passwordInput = document.getElementById('auth-password')
+
+  const trySubmit = () => {
+    const password = passwordInput.value
+    if (!password) {
+      showToast('Entre le mot de passe')
+      return
+    }
+    if (password === APP_PASSWORD) {
+      localStorage.setItem(AUTH_STORAGE_KEY, 'true')
+      state.authenticated = true
+      state.ready = false
+      render()
+      init()
+    } else {
+      showToast('Mot de passe incorrect')
+    }
+  }
+
   app.querySelectorAll('[data-action]').forEach(el => {
     el.addEventListener('click', () => {
-      const action = el.getAttribute('data-action')
-      if (action === 'auth-login') {
-        const email = document.getElementById('auth-email').value.trim()
-        const password = document.getElementById('auth-password').value
-        if (!email || !password) {
-          showToast('Remplis email et mot de passe')
-          return
-        }
-        handleLogin(email, password)
-      } else if (action === 'auth-signup') {
-        const email = document.getElementById('auth-email').value.trim()
-        const password = document.getElementById('auth-password').value
-        if (!email || !password) {
-          showToast('Remplis email et mot de passe')
-          return
-        }
-        if (password.length < 6) {
-          showToast('Mot de passe trop court (min 6 caractères)')
-          return
-        }
-        handleSignup(email, password)
-      } else if (action === 'auth-toggle-login') {
-        state.authMode = 'login'
-        render()
-      } else if (action === 'auth-toggle-signup') {
-        state.authMode = 'signup'
-        render()
-      }
+      if (el.getAttribute('data-action') === 'auth-submit') trySubmit()
     })
   })
-}
 
-async function handleLogin(email, password) {
-  const { data, error } = await login(email, password)
-  if (error) {
-    showToast('Erreur: ' + (error.message || 'identifiants incorrects'))
-    return
+  if (passwordInput) {
+    passwordInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') trySubmit()
+    })
+    passwordInput.focus()
   }
-  state.user = data.user
-  state.ready = false
-  render()
-  init()
-}
-
-async function handleSignup(email, password) {
-  const { data, error } = await signup(email, password)
-  if (error) {
-    showToast('Erreur: ' + (error.message || 'inscription échouée'))
-    return
-  }
-  showToast('Compte créé ! Vérifie ton email')
-  state.authMode = 'login'
-  render()
 }
 
 // ========== TODAY ==========
@@ -734,13 +694,13 @@ function ingredientDetailModal(ingId) {
 }
 
 // ========== EVENTS ==========
-function showToast(msg) {
+function showToast(msg, duration) {
   state.toastMsg = msg
   render()
   setTimeout(() => {
     state.toastMsg = null
     render()
-  }, 2200)
+  }, duration || 2200)
 }
 
 function bindEvents() {
@@ -921,9 +881,8 @@ function bindEvents() {
 
 function handleAction(action, el) {
   if (action === 'logout') {
-    logout()
-    state.user = null
-    state.authMode = 'login'
+    localStorage.removeItem(AUTH_STORAGE_KEY)
+    state.authenticated = false
     render()
   } else if (action === 'open-edit-profile') {
     state.modal = { type: 'edit-profile' }

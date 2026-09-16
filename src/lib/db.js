@@ -5,32 +5,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-// Auth functions
-export async function signup(email, password) {
-  const { data, error } = await supabase.auth.signUp({ email, password })
-  return { data, error }
-}
-
-export async function login(email, password) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-  return { data, error }
-}
-
-export async function logout() {
-  const { error } = await supabase.auth.signOut()
-  return { error }
-}
-
-export async function getSession() {
-  const { data, error } = await supabase.auth.getSession()
-  return { data: data?.session, error }
-}
-
-export async function onAuthStateChange(callback) {
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(callback)
-  return subscription
-}
-
 // Helper: générer un ID unique
 export function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)

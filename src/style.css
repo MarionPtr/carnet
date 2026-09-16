@@ -133,4 +133,5 @@ nav.tabs button.active{ color:var(--kcal); }
   background:var(--surface-raised); border:1px solid var(--border-strong);
   padding:10px 16px; border-radius:10px; font-size:13.5px; z-index:30;
   box-shadow:0 8px 24px rgba(0,0,0,0.3);
+  max-width:calc(100% - 32px); width:340px; text-align:center; line-height:1.4;
 }
