@@ -1175,6 +1175,7 @@ function handleAction(action, el) {
     p.sex = document.getElementById('p-sex').value
     p.activity = parseFloat(document.getElementById('p-activity').value)
     saveProfile(p)
+    state.modal = null
     render()
     showToast('Profil enregistré')
   } else if (action === 'save-custom') {
