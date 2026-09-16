@@ -154,7 +154,7 @@ function render() {
 function renderAuth() {
   let h = '<div style="max-width:480px;margin:0 auto;padding:20px;min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;">'
   h += '<div style="width:100%;max-width:400px;">'
-  h += '<h1 style="text-align:center;font-size:28px;margin-bottom:30px;font-family:Fraunces,serif;">Carnet</h1>'
+  h += '<h1 style="text-align:center;font-size:var(--text-h1);font-weight:700;margin-bottom:30px;">Carnet</h1>'
   h += '<label class="field"><span class="lbl">Mot de passe</span><input id="auth-password" type="password" placeholder="••••••••"/></label>'
   h += '<button class="btn primary block" data-action="auth-submit">Accéder</button>'
   h += '</div></div>'
@@ -248,21 +248,21 @@ function renderToday() {
   const isToday = state.currentDate === todayStr()
   let h = '<header class="top"><p class="eyebrow">Journal</p>'
   h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
-  h += '<button class="icon-btn" data-action="prev-day" style="font-size:22px;padding:4px 10px;flex-shrink:0;">‹</button>'
+  h += '<button class="icon-btn" data-action="prev-day" style="font-size:var(--text-h2);padding:4px 10px;flex-shrink:0;">‹</button>'
   h += '<h1 data-action="open-date-picker" style="cursor:pointer;text-align:center;flex:1;">' + (isToday ? 'Aujourd\'hui' : formatDateFR(parseLocalDate(state.currentDate))) + '</h1>'
-  h += '<button class="icon-btn" data-action="next-day" style="font-size:22px;padding:4px 10px;flex-shrink:0;">›</button>'
+  h += '<button class="icon-btn" data-action="next-day" style="font-size:var(--text-h2);padding:4px 10px;flex-shrink:0;">›</button>'
   h += '</div>'
   h += '</header>'
   h += '<section>'
   h += '<div class="card">'
-  h += '<div class="kcal-hero"><span class="num">' + round(totals.kcal) + ' <span style="font-size:16px;color:var(--text-muted);font-weight:400;">kcal</span></span><span class="target">objectif ' + targets.kcal + '</span></div>'
+  h += '<div class="kcal-hero"><span class="num">' + round(totals.kcal) + ' <span style="font-size:var(--text-small);color:var(--text-muted);font-weight:400;">kcal</span></span><span class="target">objectif ' + targets.kcal + '</span></div>'
   h += '<div class="macro-row"><span class="label">&nbsp;</span><div class="bar-track"><div class="bar-fill" style="width:' + (pct * 100) + '%;background:var(--kcal)"></div></div><span class="amt"></span></div>'
   h += macroRow('Protéines', totals.protein, targets.protein, 'var(--protein)')
   h += macroRow('Glucides', totals.carbs, targets.carbs, 'var(--carbs)')
   h += macroRow('Lipides', totals.fat, targets.fat, 'var(--fat)')
   h += '</div>'
   h += '<div class="row2" style="margin-bottom:12px;"><button class="btn primary block" data-action="open-add-log">+ Ajouter au journal</button></div>'
-  h += '<div class="card"><h3 style="margin:0 0 8px;font-size:15px;">' + (isToday ? 'Journal du jour' : 'Journal du ' + formatDateFR(parseLocalDate(state.currentDate))) + '</h3>'
+  h += '<div class="card"><h3 style="margin:0 0 8px;">' + (isToday ? 'Journal du jour' : 'Journal du ' + formatDateFR(parseLocalDate(state.currentDate))) + '</h3>'
 
   if (state.logs.length === 0) {
     h += '<div class="empty">Rien de mangé pour l\'instant. Ajoute une recette ou un ingrédient.</div>'
@@ -324,7 +324,7 @@ function renderIngredients() {
     h += '<div class="empty">Aucun ingrédient. Ajoute-en un pour commencer.</div>'
   } else {
     categories.forEach(cat => {
-      h += '<h4 style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin:16px 0 8px;letter-spacing:0.5px;">' + esc(cat) + '</h4>'
+      h += '<h4 style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin:16px 0 8px;letter-spacing:0.5px;">' + esc(cat) + '</h4>'
       h += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;">'
       grouped[cat].forEach((i, idx) => {
         h += '<div class="list-item" style="cursor:pointer;padding:10px 12px;border-bottom:' + (idx < grouped[cat].length - 1 ? '1px solid var(--border)' : 'none') + ';" data-action="view-ing" data-id="' + i.id + '">'
@@ -333,15 +333,15 @@ function renderIngredients() {
         if (i.photo) {
           h += '<img src="' + i.photo + '" style="width:100%;height:100%;object-fit:cover;"/>'
         } else {
-          h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:18px;">🥘</div>'
+          h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h3);">🥘</div>'
         }
         h += '</div>'
         // Info
-        h += '<div style="flex:1;"><div class="name" style="font-size:14px;">' + esc(i.name) + '</div>'
+        h += '<div style="flex:1;"><div class="name">' + esc(i.name) + '</div>'
         if (i.brands && i.brands.length > 0) {
-          h += '<div class="sub" style="font-size:10.5px;margin-bottom:2px;">' + i.brands.join(', ') + '</div>'
+          h += '<div class="sub" style="font-size:var(--text-caption);margin-bottom:2px;">' + i.brands.join(', ') + '</div>'
         }
-        h += '<div class="sub" style="font-size:11px;">' + round(i.kcal) + ' kcal · P ' + round(i.protein) + 'g · G ' + round(i.carbs) + 'g · L ' + round(i.fat) + 'g</div></div>'
+        h += '<div class="sub" style="font-size:var(--text-caption);">' + round(i.kcal) + ' kcal · P ' + round(i.protein) + 'g · G ' + round(i.carbs) + 'g · L ' + round(i.fat) + 'g</div></div>'
         h += '<div class="actions" onclick="event.stopPropagation();"><button class="icon-btn" data-action="edit-ing" data-id="' + i.id + '">✎</button><button class="icon-btn" data-action="del-ing" data-id="' + i.id + '">✕</button></div>'
         h += '</div>'
       })
@@ -384,7 +384,7 @@ function renderProfile() {
   const p = state.profile
   const targets = computeTargets(p)
 
-  let h = '<header class="top" style="text-align:center;"><h1 style="font-size:15px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Profil</h1></header>'
+  let h = '<header class="top" style="text-align:center;"><h1 style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Profil</h1></header>'
   h += '<section>'
 
   // === SECTION PROFIL ===
@@ -393,10 +393,10 @@ function renderProfile() {
 
   h += '<div class="card">'
   h += '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">'
-  h += '<div style="width:56px;height:56px;border-radius:50%;background:var(--surface-raised);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;">👤</div>'
+  h += '<div style="width:56px;height:56px;border-radius:50%;background:var(--surface-raised);display:flex;align-items:center;justify-content:center;font-size:var(--text-h1);flex-shrink:0;">👤</div>'
   h += '<div>'
-  h += '<div style="font-size:17px;font-weight:600;">' + esc(p.display_name || 'Sans nom') + '</div>'
-  h += '<div style="font-size:13px;color:var(--text-muted);margin-top:2px;">' + p.age + ' ans</div>'
+  h += '<div style="font-size:var(--text-h3);font-weight:600;">' + esc(p.display_name || 'Sans nom') + '</div>'
+  h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + p.age + ' ans</div>'
   h += '</div>'
   h += '</div>'
 
@@ -410,29 +410,29 @@ function renderProfile() {
   h += '</div>'
 
   // === SECTION OBJECTIFS ===
-  h += '<div class="card"><h3 style="margin:0 0 12px;font-size:15px;">Objectifs</h3>'
+  h += '<div class="card"><h3 style="margin:0 0 12px;">Objectifs</h3>'
   h += '<div style="margin-bottom:12px;">'
   h += '<div style="text-align:center;margin-bottom:12px;">'
-  h += '<div class="sub" style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Énergie</div>'
-  h += '<div style="font-size:28px;font-weight:700;">' + targets.kcal + ' <span style="font-size:14px;color:var(--text-muted);">kcal</span></div>'
+  h += '<div class="sub" style="font-size:var(--text-caption);color:var(--text-muted);margin-bottom:4px;">Énergie</div>'
+  h += '<div style="font-size:var(--text-h1);font-weight:700;">' + targets.kcal + ' <span style="font-size:var(--text-small);color:var(--text-muted);">kcal</span></div>'
   h += '</div>'
   h += '<div style="display:flex;justify-content:space-around;align-items:center;gap:8px;">'
-  h += '<div style="text-align:center;flex:1;"><div class="sub" style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">Protéines</div><div style="font-size:16px;font-weight:700;color:var(--protein);">' + targets.protein + 'g</div></div>'
-  h += '<div style="text-align:center;flex:1;"><div class="sub" style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">Glucides</div><div style="font-size:16px;font-weight:700;color:var(--carbs);">' + targets.carbs + 'g</div></div>'
-  h += '<div style="text-align:center;flex:1;"><div class="sub" style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">Lipides</div><div style="font-size:16px;font-weight:700;color:var(--fat);">' + targets.fat + 'g</div></div>'
+  h += '<div style="text-align:center;flex:1;"><div class="sub" style="font-size:var(--text-caption);color:var(--text-muted);margin-bottom:4px;">Protéines</div><div style="font-size:var(--text-h3);font-weight:700;color:var(--protein);">' + targets.protein + 'g</div></div>'
+  h += '<div style="text-align:center;flex:1;"><div class="sub" style="font-size:var(--text-caption);color:var(--text-muted);margin-bottom:4px;">Glucides</div><div style="font-size:var(--text-h3);font-weight:700;color:var(--carbs);">' + targets.carbs + 'g</div></div>'
+  h += '<div style="text-align:center;flex:1;"><div class="sub" style="font-size:var(--text-caption);color:var(--text-muted);margin-bottom:4px;">Lipides</div><div style="font-size:var(--text-h3);font-weight:700;color:var(--fat);">' + targets.fat + 'g</div></div>'
   h += '</div>'
   h += '</div>'
-  h += '<div class="sub" style="font-size:11px;text-align:center;color:var(--text-muted);">' + (p.use_custom ? '🔧 Mode manuel' : '📊 Calculé automatiquement') + '</div>'
+  h += '<div class="sub" style="font-size:var(--text-caption);text-align:center;color:var(--text-muted);">' + (p.use_custom ? '🔧 Mode manuel' : '📊 Calculé automatiquement') + '</div>'
   h += '</div>'
 
   // === SECTION CATÉGORIES ===
-  h += '<div class="card"><h3 style="margin:0 0 12px;font-size:15px;">Catégories d\'ingrédients</h3>'
+  h += '<div class="card"><h3 style="margin:0 0 12px;">Catégories d\'ingrédients</h3>'
   h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">'
   state.categories.forEach((cat, idx) => {
-    h += '<div style="display:flex;align-items:center;gap:4px;padding:6px 10px;background:var(--surface-raised);border-radius:8px;font-size:12px;">'
+    h += '<div style="display:flex;align-items:center;gap:4px;padding:6px 10px;background:var(--surface-raised);border-radius:8px;font-size:var(--text-small);">'
     h += '<span>' + esc(cat) + '</span>'
-    h += '<button class="icon-btn" data-action="edit-category" data-idx="' + idx + '" style="font-size:13px;padding:0;margin:0;opacity:0.6;">✎</button>'
-    h += '<button class="icon-btn" data-action="rm-category" data-idx="' + idx + '" style="font-size:14px;padding:0;margin:0;">✕</button>'
+    h += '<button class="icon-btn" data-action="edit-category" data-idx="' + idx + '" style="font-size:var(--text-small);padding:0;margin:0;opacity:0.6;">✎</button>'
+    h += '<button class="icon-btn" data-action="rm-category" data-idx="' + idx + '" style="font-size:var(--text-small);padding:0;margin:0;">✕</button>'
     h += '</div>'
   })
   h += '</div>'
@@ -443,7 +443,7 @@ function renderProfile() {
   h += '</div>'
 
   // === APPARENCE ===
-  h += '<div class="card"><h3 style="margin:0 0 12px;font-size:15px;">Apparence</h3>'
+  h += '<div class="card"><h3 style="margin:0 0 12px;">Apparence</h3>'
   h += '<div class="segmented">'
   h += '<button type="button" class="' + (state.theme === 'system' ? 'active' : '') + '" data-action="set-theme" data-theme="system">📱 Système</button>'
   h += '<button type="button" class="' + (state.theme === 'dark' ? 'active' : '') + '" data-action="set-theme" data-theme="dark">🌙 Sombre</button>'
@@ -526,7 +526,7 @@ function ingredientForm(editId) {
   const draft = state._draftIngredient
 
   let h = '<h2>' + (editId ? 'Modifier' : 'Nouvel') + ' ingrédient</h2>'
-  h += '<p style="color:var(--text-muted);font-size:12.5px;margin-top:-8px;">Valeurs pour 100 g / 100 ml</p>'
+  h += '<p style="color:var(--text-muted);font-size:var(--text-small);margin-top:-8px;">Valeurs pour 100 g / 100 ml</p>'
 
   h += '<label class="field"><span class="lbl">Nom</span><input id="f-name" value="' + esc(draft.name) + '" placeholder="ex. Blanc de poulet"/></label>'
 
@@ -537,13 +537,13 @@ function ingredientForm(editId) {
   })
   h += '<option value="__new__">+ Ajouter une catégorie</option>'
   h += '</select></label>'
-  h += '<input id="f-new-category" type="text" placeholder="Nouvelle catégorie" style="display:none;width:100%;padding:10px 11px;border:1px solid var(--border-strong);border-radius:9px;margin-bottom:10px;background:var(--bg);color:var(--text);font-size:14.5px;"/>'
+  h += '<input id="f-new-category" type="text" placeholder="Nouvelle catégorie" style="display:none;margin-bottom:10px;"/>'
 
   h += '<label class="field"><span class="lbl">Marques</span>'
   h += '<div style="margin-bottom:8px;">'
   if (draft.brands && draft.brands.length > 0) {
     draft.brands.forEach((brand, idx) => {
-      h += '<div style="display:flex;gap:6px;margin-bottom:6px;"><span style="flex:1;padding:8px;background:var(--surface-raised);border-radius:6px;font-size:13px;">' + esc(brand) + '</span><button class="icon-btn" data-action="rm-brand" data-idx="' + idx + '">✕</button></div>'
+      h += '<div style="display:flex;gap:6px;margin-bottom:6px;"><span style="flex:1;padding:8px;background:var(--surface-raised);border-radius:6px;font-size:var(--text-small);">' + esc(brand) + '</span><button class="icon-btn" data-action="rm-brand" data-idx="' + idx + '">✕</button></div>'
     })
   }
   h += '</div>'
@@ -557,7 +557,7 @@ function ingredientForm(editId) {
   if (draft.photo) {
     h += '<img src="' + draft.photo + '" style="width:100%;height:100%;object-fit:cover;"/>'
   } else {
-    h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:24px;">📷</div>'
+    h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h2);">📷</div>'
   }
   h += '</div>'
   // Boutons
@@ -713,7 +713,7 @@ function editProfileForm() {
   })
   h += '</div></label>'
 
-  h += '<h3 style="margin-top:16px;margin-bottom:8px;font-size:14px;">Objectifs</h3>'
+  h += '<h3 style="margin-top:16px;margin-bottom:8px;">Objectifs</h3>'
   h += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><input type="radio" id="p-auto" name="macro-mode" value="auto" style="width:auto;" ' + (!p.use_custom ? 'checked' : '') + '/> <span>Calculés automatiquement</span></label>'
   h += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><input type="radio" id="p-custom" name="macro-mode" value="custom" style="width:auto;" ' + (p.use_custom ? 'checked' : '') + '/> <span>Définis manuellement</span></label>'
 
@@ -757,7 +757,7 @@ function ingredientDetailModal(ingId) {
   if (ing.photo) {
     h += '<img src="' + ing.photo + '" style="width:100%;height:100%;object-fit:cover;"/>'
   } else {
-    h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:28px;">🥘</div>'
+    h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h1);">🥘</div>'
   }
   h += '</div>'
 
@@ -765,40 +765,40 @@ function ingredientDetailModal(ingId) {
 
   // Serving size
   if (ing.serving_size) {
-    h += '<div style="color:var(--text-muted);font-size:13px;margin-bottom:12px;font-weight:500;">Portion : ' + esc(ing.serving_size) + '</div>'
+    h += '<div style="color:var(--text-muted);font-size:var(--text-small);margin-bottom:12px;font-weight:500;">Portion : ' + esc(ing.serving_size) + '</div>'
   }
 
   // Category + Brands
   if (ing.category) {
-    h += '<div style="display:inline-block;padding:4px 10px;background:var(--protein);color:#221705;border-radius:6px;font-size:11px;font-weight:600;margin-bottom:12px;">' + esc(ing.category) + '</div>'
+    h += '<div style="display:inline-block;padding:4px 10px;background:var(--protein);color:#221705;border-radius:6px;font-size:var(--text-caption);font-weight:600;margin-bottom:12px;">' + esc(ing.category) + '</div>'
   }
   if (ing.brands && ing.brands.length > 0) {
-    h += '<div style="color:var(--text-muted);font-size:12px;margin-bottom:16px;">' + ing.brands.join(', ') + '</div>'
+    h += '<div style="color:var(--text-muted);font-size:var(--text-small);margin-bottom:16px;">' + ing.brands.join(', ') + '</div>'
   }
 
   // Macros en listing (style étiquette)
   h += '<div class="card" style="background:var(--surface-raised);padding:14px;margin-bottom:16px;">'
-  h += '<div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Valeurs nutritionnelles pour 100g / 100ml</div>'
+  h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Valeurs nutritionnelles pour 100g / 100ml</div>'
 
   // Ligne principale : kcal
   h += '<div style="border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:10px;">'
   h += '<div style="display:flex;justify-content:space-between;align-items:center;">'
-  h += '<div style="font-size:13px;">Énergie</div>'
-  h += '<div style="font-size:20px;font-weight:700;">' + round(ing.kcal) + ' <span style="font-size:13px;">kcal</span></div>'
+  h += '<div style="font-size:var(--text-small);">Énergie</div>'
+  h += '<div style="font-size:var(--text-h2);font-weight:700;">' + round(ing.kcal) + ' <span style="font-size:var(--text-small);">kcal</span></div>'
   h += '</div></div>'
 
   // Macros principales
   h += '<div style="display:flex;flex-direction:column;gap:10px;">'
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:13px;">Protéines</div><div style="font-weight:600;color:var(--protein);font-size:16px;">' + round(ing.protein) + ' <span style="font-size:12px;color:var(--text-muted);font-weight:400;">g</span></div></div>'
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:13px;">Glucides</div><div style="font-weight:600;color:var(--carbs);font-size:16px;">' + round(ing.carbs) + ' <span style="font-size:12px;color:var(--text-muted);font-weight:400;">g</span></div></div>'
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:13px;">Lipides</div><div style="font-weight:600;color:var(--fat);font-size:16px;">' + round(ing.fat) + ' <span style="font-size:12px;color:var(--text-muted);font-weight:400;">g</span></div></div>'
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Protéines</div><div style="font-weight:600;color:var(--protein);font-size:var(--text-h3);">' + round(ing.protein) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Glucides</div><div style="font-weight:600;color:var(--carbs);font-size:var(--text-h3);">' + round(ing.carbs) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Lipides</div><div style="font-weight:600;color:var(--fat);font-size:var(--text-h3);">' + round(ing.fat) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
 
   // Détails supplémentaires
   if (ing.fiber || ing.sugar || ing.salt) {
     h += '<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px;">'
-    if (ing.fiber) h += '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;"><div>Fibres</div><div style="font-weight:500;">' + round(ing.fiber) + ' g</div></div>'
-    if (ing.sugar) h += '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;"><div>Sucres</div><div style="font-weight:500;">' + round(ing.sugar) + ' g</div></div>'
-    if (ing.salt) h += '<div style="display:flex;justify-content:space-between;font-size:12px;"><div>Sel</div><div style="font-weight:500;">' + round(ing.salt) + ' g</div></div>'
+    if (ing.fiber) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);margin-bottom:6px;"><div>Fibres</div><div style="font-weight:500;">' + round(ing.fiber) + ' g</div></div>'
+    if (ing.sugar) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);margin-bottom:6px;"><div>Sucres</div><div style="font-weight:500;">' + round(ing.sugar) + ' g</div></div>'
+    if (ing.salt) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);"><div>Sel</div><div style="font-weight:500;">' + round(ing.salt) + ' g</div></div>'
     h += '</div>'
   }
 
