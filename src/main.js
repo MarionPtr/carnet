@@ -353,7 +353,12 @@ function renderIngredients() {
   h += '<button data-action="open-add-ing" style="width:40px;height:40px;flex-shrink:0;padding:0;line-height:1;border-radius:50%;background:var(--protein);color:#221705;border:none;font-size:22px;font-weight:500;display:flex;align-items:center;justify-content:center;cursor:pointer;">+</button>'
   h += '</header>'
   h += '<section>'
-  h += '<div class="search-wrap"><input placeholder="Rechercher…" id="ing-search" value="' + esc(state.ingSearch) + '"/></div>'
+  h += '<div class="search-wrap" style="position:relative;">'
+  h += '<input placeholder="Rechercher…" id="ing-search" value="' + esc(state.ingSearch) + '" style="' + (state.ingSearch ? 'padding-right:36px;' : '') + '"/>'
+  if (state.ingSearch) {
+    h += '<button class="icon-btn" data-action="clear-ing-search" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:var(--text-h3);">✕</button>'
+  }
+  h += '</div>'
 
   if (filtered.length === 0) {
     h += '<div class="empty">Aucun ingrédient. Ajoute-en un pour commencer.</div>'
@@ -1038,7 +1043,10 @@ function bindEvents() {
 }
 
 function handleAction(action, el) {
-  if (action === 'prev-day') {
+  if (action === 'clear-ing-search') {
+    state.ingSearch = ''
+    render()
+  } else if (action === 'prev-day') {
     changeDate(addDays(state.currentDate, -1))
   } else if (action === 'next-day') {
     changeDate(addDays(state.currentDate, 1))
