@@ -348,35 +348,33 @@ function renderIngredients() {
 
   const categories = Object.keys(grouped).sort()
 
-  let h = '<header class="top"><h1>Ingrédients</h1></header>'
+  let h = '<header class="top" style="display:flex;align-items:center;justify-content:space-between;">'
+  h += '<h1>Ingrédients</h1>'
+  h += '<button data-action="open-add-ing" style="width:40px;height:40px;flex-shrink:0;border-radius:50%;background:var(--protein);color:#221705;border:none;font-size:20px;font-weight:600;display:flex;align-items:center;justify-content:center;cursor:pointer;">+</button>'
+  h += '</header>'
   h += '<section>'
   h += '<div class="search-wrap"><input placeholder="Rechercher…" id="ing-search" value="' + esc(state.ingSearch) + '"/></div>'
-  h += '<button class="btn primary block" data-action="open-add-ing" style="margin-bottom:14px;">+ Nouvel ingrédient</button>'
   h += '<div class="card">'
 
   if (filtered.length === 0) {
     h += '<div class="empty">Aucun ingrédient. Ajoute-en un pour commencer.</div>'
   } else {
     categories.forEach(cat => {
-      h += '<h4 style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin:16px 0 8px;letter-spacing:0.5px;">' + esc(cat) + '</h4>'
+      h += '<h4 style="font-size:var(--text-h3);font-weight:700;margin:16px 0 8px;">' + esc(cat) + '</h4>'
       h += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;">'
       grouped[cat].forEach((i, idx) => {
         h += '<div class="list-item" style="cursor:pointer;padding:10px 12px;border-bottom:' + (idx < grouped[cat].length - 1 ? '1px solid var(--border)' : 'none') + ';" data-action="view-ing" data-id="' + i.id + '">'
         // Thumbnail
-        h += '<div style="width:42px;height:42px;flex-shrink:0;border-radius:8px;overflow:hidden;margin-right:10px;background:var(--surface-raised);border:1px solid var(--border);">'
+        h += '<div style="width:56px;height:56px;flex-shrink:0;border-radius:10px;overflow:hidden;margin-right:12px;background:var(--surface-raised);border:1px solid var(--border);">'
         if (i.photo) {
           h += '<img src="' + i.photo + '" style="width:100%;height:100%;object-fit:cover;"/>'
         } else {
-          h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h3);">🥘</div>'
+          h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h2);">🥘</div>'
         }
         h += '</div>'
         // Info
-        h += '<div style="flex:1;"><div class="name">' + esc(i.name) + '</div>'
-        if (i.brands && i.brands.length > 0) {
-          h += '<div class="sub" style="font-size:var(--text-caption);margin-bottom:2px;">' + i.brands.join(', ') + '</div>'
-        }
-        h += '<div class="sub" style="font-size:var(--text-caption);">' + round(i.kcal) + ' kcal · P ' + round(i.protein) + 'g · G ' + round(i.carbs) + 'g · L ' + round(i.fat) + 'g</div></div>'
-        h += '<div class="actions" onclick="event.stopPropagation();"><button class="icon-btn" data-action="edit-ing" data-id="' + i.id + '">✎</button><button class="icon-btn" data-action="del-ing" data-id="' + i.id + '">✕</button></div>'
+        h += '<div style="flex:1;"><div class="name" style="font-size:var(--text-h3);font-weight:600;">' + esc(i.name) + '</div></div>'
+        h += '<div style="color:var(--text-muted);font-size:var(--text-h3);flex-shrink:0;">›</div>'
         h += '</div>'
       })
       h += '</div>'
@@ -846,7 +844,8 @@ function ingredientDetailModal(ingId) {
 
   h += '</div></div>'
 
-  h += '<button class="btn primary block" data-action="edit-ing" data-id="' + ing.id + '">Modifier</button>'
+  h += '<button class="btn primary block" data-action="edit-ing" data-id="' + ing.id + '" style="margin-bottom:8px;">Modifier</button>'
+  h += '<button class="btn danger-outline block" data-action="del-ing" data-id="' + ing.id + '">Supprimer</button>'
 
   return h
 }
@@ -1104,6 +1103,7 @@ function handleAction(action, el) {
     const id = el.getAttribute('data-id')
     state.ingredients = state.ingredients.filter(i => i.id !== id)
     deleteIngredient(id)
+    state.modal = null
     render()
   } else if (action === 'paste-photo') {
     showToast('Colle une image (Ctrl+V)...')
