@@ -357,7 +357,7 @@ function renderProfile() {
   const p = state.profile
   const targets = computeTargets(p)
 
-  let h = '<header class="top"><p class="eyebrow">Profil</p><h1>' + esc(p.display_name || 'Réglages') + '</h1></header>'
+  let h = '<header class="top" style="text-align:center;"><h1 style="font-size:15px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Profil</h1></header>'
   h += '<section>'
 
   // === SECTION PROFIL ===
