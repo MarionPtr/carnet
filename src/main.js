@@ -288,9 +288,43 @@ function macroRow(label, val, target, color) {
 }
 
 function datePickerForm() {
-  let h = '<h2>Choisir une date</h2>'
-  h += '<label class="field"><input type="date" id="date-picker-input" value="' + state.currentDate + '"/></label>'
-  h += '<button class="btn primary block" data-action="confirm-date-pick">Valider</button>'
+  const { year, month } = state._calendarMonth
+  const monthNames = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
+  const dayLabels = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+
+  const firstOfMonth = new Date(year, month, 1)
+  const startOffset = (firstOfMonth.getDay() + 6) % 7 // 0 = lundi
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const today = todayStr()
+
+  let h = '<h2 style="text-align:center;">Choisir une date</h2>'
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">'
+  h += '<button class="icon-btn" data-action="calendar-prev-month" style="font-size:var(--text-h2);">‹</button>'
+  h += '<div style="font-weight:600;">' + monthNames[month] + ' ' + year + '</div>'
+  h += '<button class="icon-btn" data-action="calendar-next-month" style="font-size:var(--text-h2);">›</button>'
+  h += '</div>'
+
+  h += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:6px;">'
+  dayLabels.forEach(d => {
+    h += '<div style="text-align:center;font-size:var(--text-caption);color:var(--text-muted);font-weight:600;">' + d + '</div>'
+  })
+  h += '</div>'
+
+  h += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px;">'
+  for (let i = 0; i < startOffset; i++) {
+    h += '<div></div>'
+  }
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0')
+    const isSelected = dateStr === state.currentDate
+    const isToday = dateStr === today
+    let style = 'aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;font-size:var(--text-body);'
+    if (isSelected) style += 'background:var(--protein);color:#221705;font-weight:700;'
+    else if (isToday) style += 'border:1px solid var(--protein);color:var(--protein);font-weight:600;'
+    h += '<div data-action="calendar-select-day" data-date="' + dateStr + '" style="' + style + '">' + day + '</div>'
+  }
+  h += '</div>'
+
   return h
 }
 
@@ -1003,18 +1037,28 @@ function handleAction(action, el) {
   } else if (action === 'next-day') {
     changeDate(addDays(state.currentDate, 1))
   } else if (action === 'open-date-picker') {
+    const d = parseLocalDate(state.currentDate)
+    state._calendarMonth = { year: d.getFullYear(), month: d.getMonth() }
     state.modal = { type: 'date-picker' }
     render()
-    const input = document.getElementById('date-picker-input')
-    if (input && input.showPicker) {
-      try { input.showPicker() } catch (e) {}
+  } else if (action === 'calendar-prev-month') {
+    state._calendarMonth.month--
+    if (state._calendarMonth.month < 0) {
+      state._calendarMonth.month = 11
+      state._calendarMonth.year--
     }
-  } else if (action === 'confirm-date-pick') {
-    const picked = document.getElementById('date-picker-input').value
-    if (picked) {
-      state.modal = null
-      changeDate(picked)
+    render()
+  } else if (action === 'calendar-next-month') {
+    state._calendarMonth.month++
+    if (state._calendarMonth.month > 11) {
+      state._calendarMonth.month = 0
+      state._calendarMonth.year++
     }
+    render()
+  } else if (action === 'calendar-select-day') {
+    const dateStr = el.getAttribute('data-date')
+    state.modal = null
+    changeDate(dateStr)
   } else if (action === 'logout') {
     localStorage.removeItem(AUTH_STORAGE_KEY)
     localStorage.removeItem(PERSON_STORAGE_KEY)
