@@ -1,19 +1,38 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
 
 :root{
-  --bg:#1F2A24;
-  --surface:#25322B;
-  --surface-raised:#2D3B33;
+  --bg:#0A0A0A;
+  --surface:#161616;
+  --surface-raised:#1F1F1F;
   --text:#F3EFE4;
-  --text-muted:#95A79A;
-  --border: rgba(243,239,228,0.10);
-  --border-strong: rgba(243,239,228,0.18);
+  --text-muted:#8A8A8A;
+  --border: rgba(255,255,255,0.10);
+  --border-strong: rgba(255,255,255,0.18);
   --kcal:#D9CBA3;
   --protein:#E4A33C;
   --carbs:#7BA88A;
   --fat:#C97A66;
   --danger:#D06A60;
+  --nav-bg: rgba(31,31,31,0.92);
+  --track-bg: rgba(255,255,255,0.06);
   --radius: 14px;
+}
+
+[data-theme="light"]{
+  --bg:#FFFFFF;
+  --surface:#F7F6F3;
+  --surface-raised:#EFEDE7;
+  --text:#1A1A1A;
+  --text-muted:#6B6B6B;
+  --border: rgba(0,0,0,0.08);
+  --border-strong: rgba(0,0,0,0.14);
+  --kcal:#8A6D2F;
+  --protein:#B8791F;
+  --carbs:#4C7A5D;
+  --fat:#A85A42;
+  --danger:#C23B2E;
+  --nav-bg: rgba(247,246,243,0.92);
+  --track-bg: rgba(0,0,0,0.06);
 }
 
 *{ box-sizing:border-box; }
@@ -43,7 +62,7 @@ section{ padding:6px 18px 18px; }
 /* progress rows for macros */
 .macro-row{ display:flex; align-items:center; gap:10px; margin:10px 0; }
 .macro-row .label{ width:64px; font-size:13px; color:var(--text-muted); flex-shrink:0; }
-.macro-row .bar-track{ flex:1; height:8px; border-radius:5px; background:rgba(255,255,255,0.06); overflow:hidden; }
+.macro-row .bar-track{ flex:1; height:8px; border-radius:5px; background:var(--track-bg); overflow:hidden; }
 .macro-row .bar-fill{ height:100%; border-radius:5px; transition:width .35s ease; }
 .macro-row .amt{ width:96px; text-align:right; font-size:13px; color:var(--text); flex-shrink:0; font-variant-numeric:tabular-nums; }
 
@@ -95,7 +114,7 @@ label.field .lbl{ display:block; font-size:12.5px; color:var(--text-muted); marg
 
 nav.tabs{
   position:fixed; bottom:0; left:0; right:0; z-index:10;
-  background:rgba(37,50,43,0.92); backdrop-filter:blur(14px);
+  background:var(--nav-bg); backdrop-filter:blur(14px);
   border-top:1px solid var(--border);
   max-width:480px; margin:0 auto;
   display:flex; padding:8px 6px calc(8px + env(safe-area-inset-bottom));

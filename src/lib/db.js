@@ -120,30 +120,30 @@ export async function deleteRecipe(id) {
   }
 }
 
-// Charger le profil
-export async function loadProfile() {
+// Charger le profil d'une personne (person1 ou person2)
+export async function loadProfile(personId) {
   const { data, error } = await supabase
     .from('profile')
     .select('*')
-    .eq('id', 'default')
+    .eq('id', personId)
     .single()
 
   if (error && error.code === 'PGRST116') {
     // Pas trouvé, créer le profil par défaut
     const defaultProfile = {
-      id: 'default',
+      id: personId,
       weight: 70,
       height: 175,
       age: 30,
       sex: 'f',
-      activity: 1.4,
+      activity: 1.375,
       goal: 'maintain',
       use_custom: false,
       custom_kcal: 2000,
       custom_protein: 130,
       custom_carbs: 220,
       custom_fat: 65,
-      categories: ['condiment', 'dessert', 'epice', 'feculent', 'fromage', 'fruit', 'legume', 'legumineuse', 'Proteine']
+      display_name: personId === 'person1' ? 'Personne 1' : 'Personne 2'
     }
     await supabase.from('profile').insert([defaultProfile])
     return defaultProfile
@@ -152,11 +152,6 @@ export async function loadProfile() {
   if (error) {
     console.error('Erreur chargement profil:', error)
     throw error
-  }
-
-  // Assurer que categories existe
-  if (!data.categories || data.categories.length === 0) {
-    data.categories = ['condiment', 'dessert', 'epice', 'feculent', 'fromage', 'fruit', 'legume', 'legumineuse', 'Proteine']
   }
 
   return data
@@ -174,12 +169,13 @@ export async function saveProfile(profile) {
   }
 }
 
-// Charger les logs pour une date
-export async function loadLogs(dateStr) {
+// Charger les logs pour une date et une personne
+export async function loadLogs(dateStr, personId) {
   const { data, error } = await supabase
     .from('logs')
     .select('*')
     .eq('log_date', dateStr)
+    .eq('person_id', personId)
 
   if (error) {
     console.error('Erreur chargement logs:', error)
@@ -210,6 +206,58 @@ export async function deleteLog(id) {
 
   if (error) {
     console.error('Erreur suppression log:', error)
+    throw error
+  }
+}
+
+// Charger les catégories d'ingrédients
+export async function loadCategories() {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .order('name')
+
+  if (error) {
+    console.error('Erreur chargement catégories:', error)
+    return []
+  }
+  return (data || []).map(c => c.name)
+}
+
+// Ajouter une catégorie
+export async function addCategory(name) {
+  const { error } = await supabase
+    .from('categories')
+    .insert([{ id: uid(), name }])
+
+  if (error) {
+    console.error('Erreur ajout catégorie:', error)
+    throw error
+  }
+}
+
+// Renommer une catégorie
+export async function renameCategory(oldName, newName) {
+  const { error } = await supabase
+    .from('categories')
+    .update({ name: newName })
+    .eq('name', oldName)
+
+  if (error) {
+    console.error('Erreur renommage catégorie:', error)
+    throw error
+  }
+}
+
+// Supprimer une catégorie
+export async function deleteCategory(name) {
+  const { error } = await supabase
+    .from('categories')
+    .delete()
+    .eq('name', name)
+
+  if (error) {
+    console.error('Erreur suppression catégorie:', error)
     throw error
   }
 }

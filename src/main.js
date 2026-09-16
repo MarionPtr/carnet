@@ -11,7 +11,11 @@ import {
   saveProfile,
   addLog,
   deleteLog,
-  uid
+  uid,
+  loadCategories,
+  addCategory,
+  renameCategory,
+  deleteCategory
 } from './lib/db'
 import {
   round,
@@ -27,10 +31,26 @@ import {
 // Mot de passe d'accès à l'app
 const APP_PASSWORD = 'SkodaRouge12/'
 const AUTH_STORAGE_KEY = 'carnet_authenticated'
+const THEME_STORAGE_KEY = 'carnet_theme'
+const PERSON_STORAGE_KEY = 'carnet_person'
+
+const systemThemeQuery = window.matchMedia('(prefers-color-scheme: light)')
+
+function applyTheme(theme) {
+  const resolved = theme === 'system' ? (systemThemeQuery.matches ? 'light' : 'dark') : theme
+  document.documentElement.setAttribute('data-theme', resolved)
+}
+
+// Si le mode "système" est actif, suivre les changements de préférence en direct
+systemThemeQuery.addEventListener('change', () => {
+  if (state.theme === 'system') applyTheme('system')
+})
 
 // État global
 const state = {
   authenticated: false,
+  currentPerson: null, // 'person1' ou 'person2'
+  theme: 'system',
   tab: 'today',
   ready: false,
   ingredients: [],
@@ -43,11 +63,15 @@ const state = {
   logType: 'recipe',
   _draftIngredient: null,
   _draftRecipe: null,
-  categories: ['condiment', 'dessert', 'epice', 'feculent', 'fromage', 'fruit', 'legume', 'legumineuse', 'Proteine']
+  categories: []
 }
 
 // Initialisation
 async function init() {
+  // Thème
+  state.theme = localStorage.getItem(THEME_STORAGE_KEY) || 'system'
+  applyTheme(state.theme)
+
   // Vérifier si déjà authentifié (stocké localement)
   state.authenticated = localStorage.getItem(AUTH_STORAGE_KEY) === 'true'
 
@@ -57,16 +81,21 @@ async function init() {
     return
   }
 
+  // Vérifier si une personne est déjà sélectionnée
+  state.currentPerson = localStorage.getItem(PERSON_STORAGE_KEY)
+
+  if (!state.currentPerson) {
+    state.ready = true
+    render()
+    return
+  }
+
   try {
     state.ingredients = await loadIngredients()
     state.recipes = await loadRecipes()
-    state.profile = await loadProfile()
-    state.logs = await loadLogs(todayStr())
-
-    // Charger les catégories du profil, ou initialiser avec les par défaut
-    if (state.profile.categories && state.profile.categories.length > 0) {
-      state.categories = state.profile.categories
-    }
+    state.profile = await loadProfile(state.currentPerson)
+    state.logs = await loadLogs(todayStr(), state.currentPerson)
+    state.categories = await loadCategories()
   } catch (e) {
     console.error('Erreur lors du chargement:', e)
   }
@@ -87,6 +116,13 @@ function render() {
   if (!state.authenticated) {
     app.innerHTML = renderAuth()
     bindAuthEvents()
+    return
+  }
+
+  // Si pas de personne sélectionnée, afficher le choix du profil
+  if (!state.currentPerson) {
+    app.innerHTML = renderPersonSelect()
+    bindPersonSelectEvents()
     return
   }
 
@@ -149,6 +185,45 @@ function bindAuthEvents() {
     })
     passwordInput.focus()
   }
+}
+
+// ========== PERSON SELECT ==========
+function renderPersonSelect() {
+  const names = state.personNames || { person1: 'Personne 1', person2: 'Personne 2' }
+  let h = '<div style="max-width:480px;margin:0 auto;padding:20px;min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;">'
+  h += '<div style="width:100%;max-width:400px;">'
+  h += '<h1 style="text-align:center;font-size:28px;margin-bottom:30px;font-family:Fraunces,serif;">Qui es-tu ?</h1>'
+  h += '<button class="btn primary block" style="margin-bottom:12px;padding:16px;font-size:16px;" data-action="select-person" data-person="person1">' + esc(names.person1) + '</button>'
+  h += '<button class="btn primary block" style="padding:16px;font-size:16px;" data-action="select-person" data-person="person2">' + esc(names.person2) + '</button>'
+  h += '</div></div>'
+  if (state.toastMsg) h += `<div class="toast">${esc(state.toastMsg)}</div>`
+  return h
+}
+
+function bindPersonSelectEvents() {
+  const app = document.getElementById('app')
+
+  // Charger les noms personnalisés si pas déjà fait
+  if (!state.personNames) {
+    Promise.all([loadProfile('person1'), loadProfile('person2')]).then(([p1, p2]) => {
+      state.personNames = {
+        person1: p1.display_name || 'Personne 1',
+        person2: p2.display_name || 'Personne 2'
+      }
+      render()
+    })
+  }
+
+  app.querySelectorAll('[data-action="select-person"]').forEach(el => {
+    el.addEventListener('click', () => {
+      const person = el.getAttribute('data-person')
+      localStorage.setItem(PERSON_STORAGE_KEY, person)
+      state.currentPerson = person
+      state.ready = false
+      render()
+      init()
+    })
+  })
 }
 
 // ========== TODAY ==========
@@ -282,7 +357,7 @@ function renderProfile() {
   const p = state.profile
   const targets = computeTargets(p)
 
-  let h = '<header class="top"><p class="eyebrow">Réglages</p><h1>Profil</h1></header>'
+  let h = '<header class="top"><p class="eyebrow">' + esc(p.display_name || 'Réglages') + '</p><h1>Profil</h1></header>'
   h += '<section>'
 
   // === SECTION PROFIL ===
@@ -338,8 +413,18 @@ function renderProfile() {
   h += '</div>'
   h += '</div>'
 
-  // === LOGOUT ===
+  // === APPARENCE ===
+  h += '<div class="card"><h3 style="margin:0 0 12px;font-size:15px;">Apparence</h3>'
+  h += '<div class="segmented">'
+  h += '<button type="button" class="' + (state.theme === 'system' ? 'active' : '') + '" data-action="set-theme" data-theme="system">📱 Système</button>'
+  h += '<button type="button" class="' + (state.theme === 'dark' ? 'active' : '') + '" data-action="set-theme" data-theme="dark">🌙 Sombre</button>'
+  h += '<button type="button" class="' + (state.theme === 'light' ? 'active' : '') + '" data-action="set-theme" data-theme="light">☀️ Clair</button>'
+  h += '</div>'
+  h += '</div>'
+
+  // === COMPTE ===
   h += '<div class="card">'
+  h += '<button class="btn block" style="margin-bottom:10px;" data-action="switch-person">Changer de profil</button>'
   h += '<button class="btn danger-outline block" data-action="logout">Se déconnecter</button>'
   h += '</div>'
 
@@ -568,6 +653,7 @@ function editProfileForm() {
   const p = state.profile
 
   let h = '<h2>Modifier profil</h2>'
+  h += '<label class="field"><span class="lbl">Prénom</span><input type="text" id="p-display-name" value="' + esc(p.display_name || '') + '" placeholder="ex. Marion"/></label>'
   h += '<div class="row2">'
   h += '<label class="field"><span class="lbl">Poids (kg)</span><input type="number" id="p-weight" value="' + p.weight + '"/></label>'
   h += '<label class="field"><span class="lbl">Taille (cm)</span><input type="number" id="p-height" value="' + p.height + '"/></label>'
@@ -750,6 +836,7 @@ function bindEvents() {
 
   // Profile field changes - auto-save
   const profileFields = [
+    { id: 'p-display-name', field: 'display_name', type: 'string' },
     { id: 'p-weight', field: 'weight', type: 'float' },
     { id: 'p-height', field: 'height', type: 'float' },
     { id: 'p-age', field: 'age', type: 'int' },
@@ -774,6 +861,7 @@ function bindEvents() {
 
       state.profile[field] = value
       saveProfile(state.profile)
+      if (field === 'display_name') state.personNames = null
     })
   })
 
@@ -882,7 +970,19 @@ function bindEvents() {
 function handleAction(action, el) {
   if (action === 'logout') {
     localStorage.removeItem(AUTH_STORAGE_KEY)
+    localStorage.removeItem(PERSON_STORAGE_KEY)
     state.authenticated = false
+    state.currentPerson = null
+    render()
+  } else if (action === 'switch-person') {
+    localStorage.removeItem(PERSON_STORAGE_KEY)
+    state.currentPerson = null
+    render()
+  } else if (action === 'set-theme') {
+    const theme = el.getAttribute('data-theme')
+    state.theme = theme
+    localStorage.setItem(THEME_STORAGE_KEY, theme)
+    applyTheme(theme)
     render()
   } else if (action === 'open-edit-profile') {
     state.modal = { type: 'edit-profile' }
@@ -961,6 +1061,7 @@ function handleAction(action, el) {
         }
         if (!state.categories.includes(category)) {
           state.categories.push(category)
+          addCategory(category)
         }
       }
 
@@ -1095,8 +1196,7 @@ function handleAction(action, el) {
     }
     if (!state.categories.includes(cat)) {
       state.categories.push(cat)
-      state.profile.categories = state.categories
-      saveProfile(state.profile)
+      addCategory(cat)
       input.value = ''
       render()
     } else {
@@ -1108,26 +1208,26 @@ function handleAction(action, el) {
     render()
   } else if (action === 'save-category') {
     const idx = parseInt(el.getAttribute('data-idx'))
+    const oldName = state.categories[idx]
     const newName = document.getElementById('edit-cat-input').value.trim()
     if (!newName) {
       showToast('Saisis un nom pour la catégorie')
       return
     }
-    if (state.categories.includes(newName) && state.categories[idx] !== newName) {
+    if (state.categories.includes(newName) && oldName !== newName) {
       showToast('Cette catégorie existe déjà')
       return
     }
     state.categories[idx] = newName
-    state.profile.categories = state.categories
-    saveProfile(state.profile)
+    renameCategory(oldName, newName)
     state.modal = null
     render()
     showToast('Catégorie modifiée')
   } else if (action === 'rm-category') {
     const idx = parseInt(el.getAttribute('data-idx'))
+    const name = state.categories[idx]
     state.categories.splice(idx, 1)
-    state.profile.categories = state.categories
-    saveProfile(state.profile)
+    deleteCategory(name)
     render()
   } else if (action === 'close-modal' || action === 'close-modal-bg') {
     state.modal = null
@@ -1143,6 +1243,7 @@ function logRecipe(recipeId, servings) {
   const entry = {
     id: uid(),
     log_date: todayStr(),
+    person_id: state.currentPerson,
     kind: 'recipe',
     ref_id: r.id,
     name: r.name + ' (' + servings + ' part.)',
@@ -1163,6 +1264,7 @@ function logIngredient(ingId, grams) {
   const entry = {
     id: uid(),
     log_date: todayStr(),
+    person_id: state.currentPerson,
     kind: 'ingredient',
     ref_id: i.id,
     name: i.name + ' (' + grams + 'g)',
