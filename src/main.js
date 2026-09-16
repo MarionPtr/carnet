@@ -354,7 +354,6 @@ function renderIngredients() {
   h += '</header>'
   h += '<section>'
   h += '<div class="search-wrap"><input placeholder="Rechercher…" id="ing-search" value="' + esc(state.ingSearch) + '"/></div>'
-  h += '<div class="card">'
 
   if (filtered.length === 0) {
     h += '<div class="empty">Aucun ingrédient. Ajoute-en un pour commencer.</div>'
@@ -381,7 +380,7 @@ function renderIngredients() {
     })
   }
 
-  h += '</div></section>'
+  h += '</section>'
   return h
 }
 
