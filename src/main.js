@@ -459,8 +459,20 @@ function renderProfile() {
   h += '<div class="sub" style="font-size:var(--text-caption);text-align:center;color:var(--text-muted);">' + (p.use_custom ? '🔧 Mode manuel' : '📊 Calculé automatiquement') + '</div>'
   h += '</div>'
 
-  // === SECTION CATÉGORIES ===
-  h += '<div class="card"><h3 style="margin:0 0 12px;">Catégories d\'ingrédients</h3>'
+  // === PARAMÈTRES ===
+  h += '<div class="card">'
+  h += '<button class="list-item" style="width:100%;background:none;border:none;text-align:left;cursor:pointer;color:var(--text);" data-action="open-settings"><span>⚙️ Paramètres</span><span style="color:var(--text-muted);">›</span></button>'
+  h += '</div>'
+
+  h += '</section>'
+  return h
+}
+
+function settingsForm() {
+  let h = '<h2>Paramètres</h2>'
+
+  // === CATÉGORIES ===
+  h += '<h3 style="margin:0 0 12px;">Catégories d\'ingrédients</h3>'
   h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">'
   state.categories.forEach((cat, idx) => {
     h += '<div style="display:flex;align-items:center;gap:4px;padding:6px 10px;background:var(--surface-raised);border-radius:8px;font-size:var(--text-small);">'
@@ -470,28 +482,23 @@ function renderProfile() {
     h += '</div>'
   })
   h += '</div>'
-  h += '<div style="display:flex;gap:6px;">'
+  h += '<div style="display:flex;gap:6px;margin-bottom:24px;">'
   h += '<input id="new-category-input" placeholder="Nouvelle catégorie" style="flex:1;"/>'
   h += '<button class="btn small" data-action="add-category">+</button>'
   h += '</div>'
-  h += '</div>'
 
   // === APPARENCE ===
-  h += '<div class="card"><h3 style="margin:0 0 12px;">Apparence</h3>'
-  h += '<div class="segmented">'
+  h += '<h3 style="margin:0 0 12px;">Apparence</h3>'
+  h += '<div class="segmented" style="margin-bottom:24px;">'
   h += '<button type="button" class="' + (state.theme === 'system' ? 'active' : '') + '" data-action="set-theme" data-theme="system">📱 Système</button>'
   h += '<button type="button" class="' + (state.theme === 'dark' ? 'active' : '') + '" data-action="set-theme" data-theme="dark">🌙 Sombre</button>'
   h += '<button type="button" class="' + (state.theme === 'light' ? 'active' : '') + '" data-action="set-theme" data-theme="light">☀️ Clair</button>'
   h += '</div>'
-  h += '</div>'
 
   // === COMPTE ===
-  h += '<div class="card">'
   h += '<button class="btn block" style="margin-bottom:10px;" data-action="switch-person">Changer de profil</button>'
   h += '<button class="btn danger-outline block" data-action="logout">Se déconnecter</button>'
-  h += '</div>'
 
-  h += '</section>'
   return h
 }
 
@@ -539,6 +546,7 @@ function renderModal() {
   else if (m.type === 'edit-profile') body = editProfileForm()
   else if (m.type === 'edit-category') body = editCategoryForm(m.categoryIdx)
   else if (m.type === 'date-picker') body = datePickerForm()
+  else if (m.type === 'settings') body = settingsForm()
 
   return (
     '<div class="modal-backdrop" data-action="close-modal-bg">' +
@@ -1077,6 +1085,9 @@ function handleAction(action, el) {
     render()
   } else if (action === 'open-edit-profile') {
     state.modal = { type: 'edit-profile' }
+    render()
+  } else if (action === 'open-settings') {
+    state.modal = { type: 'settings' }
     render()
   } else if (action === 'view-ing') {
     state.modal = { type: 'ing-detail', ingId: el.getAttribute('data-id') }
