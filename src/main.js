@@ -350,7 +350,7 @@ function renderIngredients() {
 
   let h = '<header class="top" style="display:flex;align-items:center;justify-content:space-between;">'
   h += '<h1>Ingrédients</h1>'
-  h += '<button data-action="open-add-ing" style="width:40px;height:40px;flex-shrink:0;border-radius:50%;background:var(--protein);color:#221705;border:none;font-size:20px;font-weight:600;display:flex;align-items:center;justify-content:center;cursor:pointer;">+</button>'
+  h += '<button data-action="open-add-ing" style="width:40px;height:40px;flex-shrink:0;padding:0;line-height:1;border-radius:50%;background:var(--protein);color:#221705;border:none;font-size:22px;font-weight:500;display:flex;align-items:center;justify-content:center;cursor:pointer;">+</button>'
   h += '</header>'
   h += '<section>'
   h += '<div class="search-wrap"><input placeholder="Rechercher…" id="ing-search" value="' + esc(state.ingSearch) + '"/></div>'
