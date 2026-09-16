@@ -629,7 +629,7 @@ function renderModal() {
 function ingredientForm(editId) {
   const ing = editId
     ? state.ingredients.find(i => i.id === editId)
-    : { name: '', kcal: '', protein: '', carbs: '', fat: '', fiber: '', sugar: '', salt: '', brands: [], photo: '', serving_size: '', serving_size_grams: '' }
+    : { name: '', kcal: '', protein: '', carbs: '', fat: '', saturated_fat: '', fiber: '', sugar: '', salt: '', brands: [], photo: '', serving_size: '', serving_size_grams: '', unit: 'g' }
 
   if (!state._draftIngredient) {
     state._draftIngredient = { ...ing }
@@ -637,7 +637,22 @@ function ingredientForm(editId) {
   const draft = state._draftIngredient
 
   let h = '<h2>' + (editId ? 'Modifier' : 'Nouvel') + ' ingrédient</h2>'
-  h += '<p style="color:var(--text-muted);font-size:var(--text-small);margin-top:-8px;">Valeurs pour 100 g / 100 ml</p>'
+
+  // Photo en premier
+  h += '<label class="field"><span class="lbl">Photo</span>'
+  h += '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;">'
+  h += '<div style="width:80px;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--surface-raised);border:1px solid var(--border);flex-shrink:0;" id="photo-preview">'
+  if (draft.photo) {
+    h += '<img src="' + draft.photo + '" style="width:100%;height:100%;object-fit:cover;"/>'
+  } else {
+    h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h2);">📷</div>'
+  }
+  h += '</div>'
+  h += '<div style="flex:1;">'
+  h += '<input type="text" id="f-photo-url" placeholder="Colle un lien URL d\'image" value="' + esc(draft.photo || '') + '" style="width:100%;"/>'
+  h += '</div>'
+  h += '</div>'
+  h += '</label>'
 
   h += '<label class="field"><span class="lbl">Nom</span><input id="f-name" value="' + esc(draft.name) + '" placeholder="ex. Blanc de poulet"/></label>'
 
@@ -661,41 +676,35 @@ function ingredientForm(editId) {
   h += '<div style="display:flex;gap:6px;"><input id="f-brand-input" placeholder="Ajouter une marque" style="flex:1;"/><button class="btn small" data-action="add-brand">+</button></div>'
   h += '</label>'
 
-  h += '<label class="field"><span class="lbl">Photo</span>'
-  h += '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;">'
-  // Aperçu photo
-  h += '<div style="width:80px;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--surface-raised);border:1px solid var(--border);flex-shrink:0;" id="photo-preview">'
-  if (draft.photo) {
-    h += '<img src="' + draft.photo + '" style="width:100%;height:100%;object-fit:cover;"/>'
-  } else {
-    h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h2);">📷</div>'
-  }
-  h += '</div>'
-  // Champ URL
-  h += '<div style="flex:1;">'
-  h += '<input type="text" id="f-photo-url" placeholder="Colle un lien URL d\'image" value="' + esc(draft.photo || '') + '" style="width:100%;"/>'
-  h += '</div>'
-  h += '</div>'
-  h += '</label>'
-
   h += '<div class="row2">'
   h += '<label class="field"><span class="lbl">Nom de la portion</span><input id="f-serving-size" value="' + esc(draft.serving_size || '') + '" placeholder="ex. 1 yaourt, 1 tranche"/></label>'
   h += '<label class="field"><span class="lbl">Poids (g)</span><input type="number" id="f-serving-size-grams" value="' + (draft.serving_size_grams || '') + '" placeholder="ex. 125"/></label>'
   h += '</div>'
 
+  // Séparateur avant la partie valeurs nutritionnelles
+  h += '<div style="border-top:1px solid var(--border);margin:16px 0;"></div>'
+  const unit = draft.unit || 'g'
+  h += '<label class="field"><span class="lbl">Valeurs nutritionnelles pour 100</span>'
+  h += '<div class="segmented">'
+  h += '<button type="button" class="' + (unit === 'g' ? 'active' : '') + '" data-action="set-ing-unit" data-unit="g">g</button>'
+  h += '<button type="button" class="' + (unit === 'ml' ? 'active' : '') + '" data-action="set-ing-unit" data-unit="ml">ml</button>'
+  h += '</div>'
+  h += '</label>'
+
   h += '<label class="field"><span class="lbl">Calories (kcal)</span><input type="number" id="f-kcal" value="' + (draft.kcal || '') + '"/></label>'
   h += '<div class="row2">'
-  h += '<label class="field"><span class="lbl">Protéines (g)</span><input type="number" id="f-protein" value="' + (draft.protein || '') + '"/></label>'
-  h += '<label class="field"><span class="lbl">Glucides (g)</span><input type="number" id="f-carbs" value="' + (draft.carbs || '') + '"/></label>'
+  h += '<label class="field"><span class="lbl">Lipides (g)</span><input type="number" id="f-fat" value="' + (draft.fat || '') + '"/></label>'
+  h += '<label class="field"><span class="lbl">dont acides gras saturés (g)</span><input type="number" id="f-saturated-fat" value="' + (draft.saturated_fat || '') + '"/></label>'
   h += '</div>'
   h += '<div class="row2">'
-  h += '<label class="field"><span class="lbl">Lipides (g)</span><input type="number" id="f-fat" value="' + (draft.fat || '') + '"/></label>'
+  h += '<label class="field"><span class="lbl">Glucides (g)</span><input type="number" id="f-carbs" value="' + (draft.carbs || '') + '"/></label>'
+  h += '<label class="field"><span class="lbl">dont sucres (g)</span><input type="number" id="f-sugar" value="' + (draft.sugar || '') + '"/></label>'
+  h += '</div>'
+  h += '<div class="row2">'
+  h += '<label class="field"><span class="lbl">Protéines (g)</span><input type="number" id="f-protein" value="' + (draft.protein || '') + '"/></label>'
   h += '<label class="field"><span class="lbl">Fibres (g)</span><input type="number" id="f-fiber" value="' + (draft.fiber || '') + '"/></label>'
   h += '</div>'
-  h += '<div class="row2">'
-  h += '<label class="field"><span class="lbl">Sucres (g)</span><input type="number" id="f-sugar" value="' + (draft.sugar || '') + '"/></label>'
   h += '<label class="field"><span class="lbl">Sel (g)</span><input type="number" id="f-salt" value="' + (draft.salt || '') + '"/></label>'
-  h += '</div>'
 
   h += '<button class="btn primary block" id="save-ing-btn" data-action="save-ing" data-id="' + (editId || '') + '">Enregistrer</button>'
   return h
@@ -799,7 +808,7 @@ function addLogForm() {
       const gramsValue = (selectedIng && selectedIng.serving_size_grams && state.logGramsMode === 'portion')
         ? selectedIng.serving_size_grams
         : 100
-      h += '<label class="field"><span class="lbl">Quantité (g)</span><input type="number" id="log-grams" value="' + gramsValue + '" ' + (state.logGramsMode === 'portion' ? 'readonly' : '') + '/></label>'
+      h += '<label class="field"><span class="lbl">Quantité (' + (selectedIng.unit || 'g') + ')</span><input type="number" id="log-grams" value="' + gramsValue + '" ' + (state.logGramsMode === 'portion' ? 'readonly' : '') + '/></label>'
       h += '<button class="btn primary block" data-action="confirm-log-ing">Ajouter</button>'
     }
   }
@@ -920,7 +929,8 @@ function ingredientDetailModal(ingId) {
 
   // Macros en listing (style étiquette)
   h += '<div class="card" style="background:var(--surface-raised);padding:14px;margin-bottom:16px;">'
-  h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Valeurs nutritionnelles ' + (showPortion ? 'pour la portion (' + ing.serving_size_grams + 'g)' : 'pour 100g / 100ml') + '</div>'
+  const ingUnit = ing.unit || 'g'
+  h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Valeurs nutritionnelles ' + (showPortion ? 'pour la portion (' + ing.serving_size_grams + 'g)' : 'pour 100 ' + ingUnit) + '</div>'
 
   // Ligne principale : kcal
   h += '<div style="border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:10px;">'
@@ -936,10 +946,11 @@ function ingredientDetailModal(ingId) {
   h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Lipides</div><div style="font-weight:600;color:var(--fat);font-size:var(--text-h3);">' + round(ing.fat * factor) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
 
   // Détails supplémentaires
-  if (ing.fiber || ing.sugar || ing.salt) {
+  if (ing.saturated_fat || ing.fiber || ing.sugar || ing.salt) {
     h += '<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px;">'
-    if (ing.fiber) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);margin-bottom:6px;"><div>Fibres</div><div style="font-weight:500;">' + round(ing.fiber * factor) + ' g</div></div>'
+    if (ing.saturated_fat) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);margin-bottom:6px;"><div>Acides gras saturés</div><div style="font-weight:500;">' + round(ing.saturated_fat * factor) + ' g</div></div>'
     if (ing.sugar) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);margin-bottom:6px;"><div>Sucres</div><div style="font-weight:500;">' + round(ing.sugar * factor) + ' g</div></div>'
+    if (ing.fiber) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);margin-bottom:6px;"><div>Fibres</div><div style="font-weight:500;">' + round(ing.fiber * factor) + ' g</div></div>'
     if (ing.salt) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);"><div>Sel</div><div style="font-weight:500;">' + round(ing.salt * factor) + ' g</div></div>'
     h += '</div>'
   }
@@ -1166,6 +1177,10 @@ function handleAction(action, el) {
       state.ingVisibleCategories = null
     }
     render()
+  } else if (action === 'set-ing-unit') {
+    if (!state._draftIngredient) state._draftIngredient = {}
+    state._draftIngredient.unit = el.getAttribute('data-unit')
+    render()
   } else if (action === 'prev-day') {
     changeDate(addDays(state.currentDate, -1))
   } else if (action === 'next-day') {
@@ -1294,9 +1309,11 @@ function handleAction(action, el) {
         protein: parseFloat(document.getElementById('f-protein').value) || 0,
         carbs: parseFloat(document.getElementById('f-carbs').value) || 0,
         fat: parseFloat(document.getElementById('f-fat').value) || 0,
+        saturated_fat: parseFloat(document.getElementById('f-saturated-fat').value) || 0,
         fiber: parseFloat(document.getElementById('f-fiber').value) || 0,
         sugar: parseFloat(document.getElementById('f-sugar').value) || 0,
         salt: parseFloat(document.getElementById('f-salt').value) || 0,
+        unit: state._draftIngredient?.unit || 'g',
         brands: state._draftIngredient?.brands || [],
         photo: photo
       }
