@@ -247,6 +247,17 @@ export async function renameCategory(oldName, newName) {
     console.error('Erreur renommage catégorie:', error)
     throw error
   }
+
+  // Répercuter le renommage sur les ingrédients qui référencent l'ancien nom
+  const { error: ingError } = await supabase
+    .from('ingredients')
+    .update({ category: newName })
+    .eq('category', oldName)
+
+  if (ingError) {
+    console.error('Erreur mise à jour catégorie des ingrédients:', ingError)
+    throw ingError
+  }
 }
 
 // Supprimer une catégorie

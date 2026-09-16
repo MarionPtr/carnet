@@ -1322,6 +1322,9 @@ function handleAction(action, el) {
       return
     }
     state.categories[idx] = newName
+    state.ingredients.forEach(i => {
+      if (i.category === oldName) i.category = newName
+    })
     renameCategory(oldName, newName)
     state.modal = null
     render()
