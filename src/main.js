@@ -604,10 +604,9 @@ function ingredientForm(editId) {
     h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h2);">📷</div>'
   }
   h += '</div>'
-  // Boutons
+  // Champ URL
   h += '<div style="flex:1;">'
-  h += '<button class="btn small" data-action="paste-photo" style="width:100%;margin-bottom:6px;">📋 Coller photo</button>'
-  h += '<input type="file" id="f-photo" accept="image/*" style="cursor:pointer;width:100%;"/>'
+  h += '<input type="text" id="f-photo-url" placeholder="Colle un lien URL d\'image" value="' + esc(draft.photo || '') + '" style="width:100%;"/>'
   h += '</div>'
   h += '</div>'
   h += '</label>'
@@ -1012,33 +1011,19 @@ function bindEvents() {
 
   updateButtonState()
 
-  // Paste image support - attach to app so modal events are captured
-  if (app && !app._pasteListenerAttached) {
-    const handlePaste = (e) => {
-      // Only process if we have a draft ingredient
-      if (!state._draftIngredient) return
-
-      const items = e.clipboardData?.items || []
-      for (let item of items) {
-        if (item.type.startsWith('image/')) {
-          e.preventDefault()
-          const file = item.getAsFile()
-          if (!file) return
-
-          const reader = new FileReader()
-          reader.onload = () => {
-            state._draftIngredient.photo = reader.result
-            render()
-            showToast('Photo collée ✓')
-          }
-          reader.readAsDataURL(file)
-          return
-        }
+  // Photo URL field - update preview live
+  const photoUrlInput = document.getElementById('f-photo-url')
+  if (photoUrlInput) {
+    photoUrlInput.addEventListener('input', () => {
+      if (!state._draftIngredient) state._draftIngredient = {}
+      state._draftIngredient.photo = photoUrlInput.value.trim()
+      const preview = document.getElementById('photo-preview')
+      if (preview) {
+        preview.innerHTML = state._draftIngredient.photo
+          ? '<img src="' + esc(state._draftIngredient.photo) + '" style="width:100%;height:100%;object-fit:cover;"/>'
+          : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h2);">📷</div>'
       }
-    }
-
-    app.addEventListener('paste', handlePaste)
-    app._pasteListenerAttached = true
+    })
   }
 }
 
@@ -1112,8 +1097,6 @@ function handleAction(action, el) {
     deleteIngredient(id)
     state.modal = null
     render()
-  } else if (action === 'paste-photo') {
-    showToast('Colle une image (Ctrl+V)...')
   } else if (action === 'add-brand') {
     if (!state._draftIngredient) state._draftIngredient = {}
     const input = document.getElementById('f-brand-input')
@@ -1139,19 +1122,7 @@ function handleAction(action, el) {
       return
     }
 
-    const photoInput = document.getElementById('f-photo')
-    let photo = state._draftIngredient?.photo || ''
-
-    if (photoInput && photoInput.files.length > 0) {
-      const file = photoInput.files[0]
-      const reader = new FileReader()
-      reader.onload = () => {
-        photo = reader.result
-        saveIngredientWithPhoto()
-      }
-      reader.readAsDataURL(file)
-      return
-    }
+    const photo = document.getElementById('f-photo-url').value.trim()
 
     saveIngredientWithPhoto()
 
