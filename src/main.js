@@ -201,10 +201,13 @@ function bindAuthEvents() {
 function renderPersonSelect() {
   const names = state.personNames || { person1: 'Personne 1', person2: 'Personne 2' }
   let h = '<div style="max-width:480px;margin:0 auto;padding:20px;min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;">'
-  h += '<div style="width:100%;max-width:400px;">'
-  h += '<h1 style="text-align:center;font-size:28px;margin-bottom:30px;font-family:Fraunces,serif;">Qui es-tu ?</h1>'
-  h += '<button class="btn primary block" style="margin-bottom:12px;padding:16px;font-size:16px;" data-action="select-person" data-person="person1">' + esc(names.person1) + '</button>'
-  h += '<button class="btn primary block" style="padding:16px;font-size:16px;" data-action="select-person" data-person="person2">' + esc(names.person2) + '</button>'
+  h += '<div class="profile-picker">'
+  ;['person1', 'person2'].forEach(id => {
+    h += '<button class="profile-picker-item" data-action="select-person" data-person="' + id + '">'
+    h += '<span class="profile-picker-avatar">👤</span>'
+    h += '<span class="profile-picker-name">' + esc(names[id]) + '</span>'
+    h += '</button>'
+  })
   h += '</div></div>'
   if (state.toastMsg) h += `<div class="toast">${esc(state.toastMsg)}</div>`
   return h
