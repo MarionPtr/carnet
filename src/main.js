@@ -63,6 +63,7 @@ const state = {
   modal: null,
   toastMsg: null,
   ingSearch: '',
+  collapsedCategories: {},
   logType: 'recipe',
   _draftIngredient: null,
   _draftRecipe: null,
@@ -364,24 +365,30 @@ function renderIngredients() {
     h += '<div class="empty">Aucun ingrédient. Ajoute-en un pour commencer.</div>'
   } else {
     categories.forEach(cat => {
-      h += '<h4 style="font-size:var(--text-h3);font-weight:700;margin:16px 0 8px;">' + esc(cat) + '</h4>'
-      h += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;">'
-      grouped[cat].forEach((i, idx) => {
-        h += '<div class="list-item" style="cursor:pointer;padding:10px 12px;border-bottom:' + (idx < grouped[cat].length - 1 ? '1px solid var(--border)' : 'none') + ';" data-action="view-ing" data-id="' + i.id + '">'
-        // Thumbnail
-        h += '<div style="width:56px;height:56px;flex-shrink:0;border-radius:10px;overflow:hidden;margin-right:12px;background:var(--surface-raised);border:1px solid var(--border);">'
-        if (i.photo) {
-          h += '<img src="' + i.photo + '" style="width:100%;height:100%;object-fit:cover;"/>'
-        } else {
-          h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h2);">🥘</div>'
-        }
-        h += '</div>'
-        // Info
-        h += '<div style="flex:1;"><div class="name" style="font-size:var(--text-h3);font-weight:600;">' + esc(i.name) + '</div></div>'
-        h += '<div style="color:var(--text-muted);font-size:var(--text-h3);flex-shrink:0;">›</div>'
-        h += '</div>'
-      })
+      const isCollapsed = !!state.collapsedCategories[cat]
+      h += '<div data-action="toggle-category" data-cat="' + esc(cat) + '" style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px;cursor:pointer;">'
+      h += '<h4 style="font-size:var(--text-h3);font-weight:700;margin:0;">' + esc(cat) + '</h4>'
+      h += '<span style="color:var(--text-muted);font-size:var(--text-small);display:inline-block;transform:rotate(' + (isCollapsed ? '-90deg' : '0deg') + ');transition:transform .15s ease;">▾</span>'
       h += '</div>'
+      if (!isCollapsed) {
+        h += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;">'
+        grouped[cat].forEach((i, idx) => {
+          h += '<div class="list-item" style="cursor:pointer;padding:10px 12px;border-bottom:' + (idx < grouped[cat].length - 1 ? '1px solid var(--border)' : 'none') + ';" data-action="view-ing" data-id="' + i.id + '">'
+          // Thumbnail
+          h += '<div style="width:56px;height:56px;flex-shrink:0;border-radius:10px;overflow:hidden;margin-right:12px;background:var(--surface-raised);border:1px solid var(--border);">'
+          if (i.photo) {
+            h += '<img src="' + i.photo + '" style="width:100%;height:100%;object-fit:cover;"/>'
+          } else {
+            h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h2);">🥘</div>'
+          }
+          h += '</div>'
+          // Info
+          h += '<div style="flex:1;"><div class="name" style="font-size:var(--text-h3);font-weight:600;">' + esc(i.name) + '</div></div>'
+          h += '<div style="color:var(--text-muted);font-size:28px;line-height:1;flex-shrink:0;padding-left:6px;">›</div>'
+          h += '</div>'
+        })
+        h += '</div>'
+      }
     })
   }
 
@@ -847,8 +854,10 @@ function ingredientDetailModal(ingId) {
 
   h += '</div></div>'
 
-  h += '<button class="btn primary block" data-action="edit-ing" data-id="' + ing.id + '" style="margin-bottom:8px;">Modifier</button>'
-  h += '<button class="btn danger-outline block" data-action="del-ing" data-id="' + ing.id + '">Supprimer</button>'
+  h += '<div class="row2">'
+  h += '<button class="btn primary" data-action="edit-ing" data-id="' + ing.id + '">Modifier</button>'
+  h += '<button class="btn danger-outline" data-action="del-ing" data-id="' + ing.id + '">Supprimer</button>'
+  h += '</div>'
 
   return h
 }
@@ -1030,6 +1039,10 @@ function bindEvents() {
 function handleAction(action, el) {
   if (action === 'clear-ing-search') {
     state.ingSearch = ''
+    render()
+  } else if (action === 'toggle-category') {
+    const cat = el.getAttribute('data-cat')
+    state.collapsedCategories[cat] = !state.collapsedCategories[cat]
     render()
   } else if (action === 'prev-day') {
     changeDate(addDays(state.currentDate, -1))

@@ -63,7 +63,7 @@ h2{ font-size:var(--text-h2); font-weight:700; }
 h3{ font-size:var(--text-h3); font-weight:600; }
 
 #app{ max-width:480px; margin:0 auto; min-height:100vh; min-height:100dvh; position:relative; }
-#app:has(nav.tabs){ padding-bottom:92px; }
+#app:has(nav.tabs){ padding-bottom:104px; }
 
 header.top{ padding:calc(22px + env(safe-area-inset-top)) 18px 10px; }
 header.top .eyebrow{ color:var(--text-muted); font-size:var(--text-small); margin:0 0 2px; }
@@ -137,12 +137,12 @@ nav.tabs{
   border-radius:999px;
   box-shadow:0 8px 24px rgba(0,0,0,0.25);
   max-width:452px; margin:0 auto;
-  display:flex; padding:6px;
+  display:flex; padding:8px;
 }
 nav.tabs button{
   flex:1; background:none; border:none; color:var(--text-muted);
-  display:flex; flex-direction:column; align-items:center; gap:3px;
-  font-size:var(--text-caption); font-weight:500; padding:8px 2px; border-radius:999px;
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  font-size:var(--text-caption); font-weight:500; padding:12px 2px; border-radius:999px;
 }
 nav.tabs button svg{ width:20px; height:20px; }
 nav.tabs button.active{ color:var(--kcal); background:var(--surface-raised); }
