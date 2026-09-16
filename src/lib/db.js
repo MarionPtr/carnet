@@ -228,7 +228,7 @@ export async function loadCategories() {
 export async function addCategory(name) {
   const { error } = await supabase
     .from('categories')
-    .insert([{ id: uid(), name }])
+    .insert([{ name }])
 
   if (error) {
     console.error('Erreur ajout catégorie:', error)
