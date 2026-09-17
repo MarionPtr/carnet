@@ -139,10 +139,14 @@ export async function loadProfile(personId) {
       activity: 1.375,
       goal: 'maintain',
       use_custom: false,
+      custom_mode: 'grams',
       custom_kcal: 2000,
       custom_protein: 130,
       custom_carbs: 220,
       custom_fat: 65,
+      custom_pct_protein: 30,
+      custom_pct_carbs: 40,
+      custom_pct_fat: 30,
       display_name: personId === 'person1' ? 'Personne 1' : 'Personne 2'
     }
     await supabase.from('profile').insert([defaultProfile])

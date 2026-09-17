@@ -47,10 +47,10 @@ export function addDays(dateStr, delta) {
 export function computeTargets(profile) {
   if (profile.use_custom) {
     return {
-      kcal: profile.custom_kcal,
-      protein: profile.custom_protein,
-      carbs: profile.custom_carbs,
-      fat: profile.custom_fat
+      kcal: round(profile.custom_kcal),
+      protein: round(profile.custom_protein),
+      carbs: round(profile.custom_carbs),
+      fat: round(profile.custom_fat)
     }
   }
 

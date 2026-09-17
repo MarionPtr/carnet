@@ -897,14 +897,28 @@ function editProfileForm() {
   h += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><input type="radio" id="p-custom" name="macro-mode" value="custom" style="width:auto;" ' + (p.use_custom ? 'checked' : '') + '/> <span>Définis manuellement</span></label>'
 
   h += '<div id="custom-macros" style="display:' + (p.use_custom ? 'block' : 'none') + ';">'
-  h += '<div class="row2">'
-  h += '<label class="field"><span class="lbl">Kcal</span><input type="number" id="c-kcal" value="' + p.custom_kcal + '"/></label>'
-  h += '<label class="field"><span class="lbl">Protéines (g)</span><input type="number" id="c-protein" value="' + p.custom_protein + '"/></label>'
+  const customMode = p.custom_mode || 'grams'
+  h += '<div class="segmented" style="margin-bottom:14px;">'
+  h += '<button type="button" class="' + (customMode !== 'kcal_pct' ? 'active' : '') + '" data-action="set-custom-mode" data-mode="grams">Grammes</button>'
+  h += '<button type="button" class="' + (customMode === 'kcal_pct' ? 'active' : '') + '" data-action="set-custom-mode" data-mode="kcal_pct">Kcal + %</button>'
   h += '</div>'
-  h += '<div class="row2">'
-  h += '<label class="field"><span class="lbl">Glucides (g)</span><input type="number" id="c-carbs" value="' + p.custom_carbs + '"/></label>'
-  h += '<label class="field"><span class="lbl">Lipides (g)</span><input type="number" id="c-fat" value="' + p.custom_fat + '"/></label>'
-  h += '</div>'
+
+  if (customMode === 'kcal_pct') {
+    h += '<label class="field"><span class="lbl">Kcal</span><input type="number" id="c-kcal" value="' + p.custom_kcal + '"/></label>'
+    h += '<div class="row2">'
+    h += '<label class="field"><span class="lbl">% Protéines</span><input type="number" id="c-pct-protein" value="' + (p.custom_pct_protein ?? 30) + '"/></label>'
+    h += '<label class="field"><span class="lbl">% Glucides</span><input type="number" id="c-pct-carbs" value="' + (p.custom_pct_carbs ?? 40) + '"/></label>'
+    h += '</div>'
+    h += '<label class="field"><span class="lbl">% Lipides</span><input type="number" id="c-pct-fat" value="' + (p.custom_pct_fat ?? 30) + '"/></label>'
+    h += '<div class="sub" id="c-grams-computed" style="margin-top:4px;">' + round(p.custom_protein) + 'g P · ' + round(p.custom_carbs) + 'g G · ' + round(p.custom_fat) + 'g L</div>'
+  } else {
+    h += '<div class="row2">'
+    h += '<label class="field"><span class="lbl">Protéines (g)</span><input type="number" id="c-protein" value="' + p.custom_protein + '"/></label>'
+    h += '<label class="field"><span class="lbl">Glucides (g)</span><input type="number" id="c-carbs" value="' + p.custom_carbs + '"/></label>'
+    h += '</div>'
+    h += '<label class="field"><span class="lbl">Lipides (g)</span><input type="number" id="c-fat" value="' + p.custom_fat + '"/></label>'
+    h += '<div class="sub" style="margin-top:4px;">Total : <span id="c-kcal-computed">' + round(p.custom_kcal) + '</span> kcal</div>'
+  }
   h += '</div>'
 
   h += '<button class="btn primary block" data-action="save-profile" style="margin-top:12px;">Enregistrer</button>'
@@ -1073,11 +1087,7 @@ function bindEvents() {
     { id: 'p-birthdate', field: 'birthdate', type: 'string' },
     { id: 'p-sex', field: 'sex', type: 'string' },
     { id: 'p-activity', field: 'activity', type: 'float' },
-    { id: 'p-custom', field: 'use_custom', type: 'bool' },
-    { id: 'c-kcal', field: 'custom_kcal', type: 'float' },
-    { id: 'c-protein', field: 'custom_protein', type: 'float' },
-    { id: 'c-carbs', field: 'custom_carbs', type: 'float' },
-    { id: 'c-fat', field: 'custom_fat', type: 'float' }
+    { id: 'p-custom', field: 'use_custom', type: 'bool' }
   ]
 
   profileFields.forEach(({ id, field, type }) => {
@@ -1113,6 +1123,8 @@ function bindEvents() {
       saveProfile(state.profile)
     })
   }
+
+  bindCustomMacroInputs()
 
   // Log meal select
   const logMealSelect = document.getElementById('log-meal')
@@ -1202,6 +1214,69 @@ function bindEvents() {
   }
 }
 
+function bindCustomMacroInputs() {
+  const mode = state.profile.custom_mode || 'grams'
+
+  if (mode === 'kcal_pct') {
+    const kcalEl = document.getElementById('c-kcal')
+    const pctProteinEl = document.getElementById('c-pct-protein')
+    const pctCarbsEl = document.getElementById('c-pct-carbs')
+    const pctFatEl = document.getElementById('c-pct-fat')
+    const gramsDisplay = document.getElementById('c-grams-computed')
+    if (!kcalEl || !pctProteinEl || !pctCarbsEl || !pctFatEl) return
+
+    const recompute = () => {
+      const kcal = parseFloat(kcalEl.value) || 0
+      const pctProtein = parseFloat(pctProteinEl.value) || 0
+      const pctCarbs = parseFloat(pctCarbsEl.value) || 0
+      const pctFat = parseFloat(pctFatEl.value) || 0
+      const protein = (kcal * pctProtein) / 100 / 4
+      const carbs = (kcal * pctCarbs) / 100 / 4
+      const fat = (kcal * pctFat) / 100 / 9
+
+      state.profile.custom_kcal = kcal
+      state.profile.custom_pct_protein = pctProtein
+      state.profile.custom_pct_carbs = pctCarbs
+      state.profile.custom_pct_fat = pctFat
+      state.profile.custom_protein = protein
+      state.profile.custom_carbs = carbs
+      state.profile.custom_fat = fat
+
+      if (gramsDisplay) {
+        const totalPct = pctProtein + pctCarbs + pctFat
+        gramsDisplay.innerHTML = round(protein) + 'g P · ' + round(carbs) + 'g G · ' + round(fat) + 'g L' +
+          (totalPct !== 100 ? ' <span style="color:var(--danger);">(total ' + round(totalPct) + '%)</span>' : '')
+      }
+      saveProfile(state.profile)
+    }
+
+    ;[kcalEl, pctProteinEl, pctCarbsEl, pctFatEl].forEach(el => el.addEventListener('input', recompute))
+  } else {
+    const proteinEl = document.getElementById('c-protein')
+    const carbsEl = document.getElementById('c-carbs')
+    const fatEl = document.getElementById('c-fat')
+    const kcalDisplay = document.getElementById('c-kcal-computed')
+    if (!proteinEl || !carbsEl || !fatEl) return
+
+    const recompute = () => {
+      const protein = parseFloat(proteinEl.value) || 0
+      const carbs = parseFloat(carbsEl.value) || 0
+      const fat = parseFloat(fatEl.value) || 0
+      const kcal = protein * 4 + carbs * 4 + fat * 9
+
+      state.profile.custom_protein = protein
+      state.profile.custom_carbs = carbs
+      state.profile.custom_fat = fat
+      state.profile.custom_kcal = kcal
+
+      if (kcalDisplay) kcalDisplay.textContent = round(kcal)
+      saveProfile(state.profile)
+    }
+
+    ;[proteinEl, carbsEl, fatEl].forEach(el => el.addEventListener('input', recompute))
+  }
+}
+
 function handleAction(action, el) {
   if (action === 'clear-ing-search') {
     state.ingSearch = ''
@@ -1244,6 +1319,10 @@ function handleAction(action, el) {
   } else if (action === 'set-ing-unit') {
     if (!state._draftIngredient) state._draftIngredient = {}
     state._draftIngredient.unit = el.getAttribute('data-unit')
+    render()
+  } else if (action === 'set-custom-mode') {
+    state.profile.custom_mode = el.getAttribute('data-mode')
+    saveProfile(state.profile)
     render()
   } else if (action === 'prev-day') {
     changeDate(addDays(state.currentDate, -1))
@@ -1486,16 +1565,6 @@ function handleAction(action, el) {
     state.modal = null
     render()
     showToast('Profil enregistré')
-  } else if (action === 'save-custom') {
-    const p2 = state.profile
-    p2.use_custom = document.getElementById('p-custom').checked
-    p2.custom_kcal = parseFloat(document.getElementById('c-kcal').value) || 0
-    p2.custom_protein = parseFloat(document.getElementById('c-protein').value) || 0
-    p2.custom_carbs = parseFloat(document.getElementById('c-carbs').value) || 0
-    p2.custom_fat = parseFloat(document.getElementById('c-fat').value) || 0
-    saveProfile(p2)
-    render()
-    showToast('Objectifs enregistrés')
   } else if (action === 'add-category') {
     const input = document.getElementById('new-category-input')
     const cat = input.value.trim()
