@@ -291,8 +291,16 @@ function renderToday() {
 
   MEALS.forEach(meal => {
     const entries = state.logs.filter(log => (log.meal || 'snacks') === meal.key)
+    const mealTotals = dayTotals(entries)
     h += '<div class="card">'
-    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><h3 style="margin:0;">' + meal.label + '</h3><button data-action="open-add-log" data-meal="' + meal.key + '" style="width:32px;height:32px;flex-shrink:0;padding:0;line-height:1;border-radius:50%;background:var(--surface-raised);border:1px solid var(--border-strong);color:var(--text);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;">+</button></div>'
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+    h += '<div><h3 style="margin:0;">' + meal.label + '</h3>'
+    if (entries.length > 0) {
+      h += '<div style="font-size:var(--text-caption);color:var(--text-muted);margin-top:2px;">' + round(mealTotals.kcal) + ' kcal · ' + round(mealTotals.protein) + 'g P · ' + round(mealTotals.carbs) + 'g G · ' + round(mealTotals.fat) + 'g L</div>'
+    }
+    h += '</div>'
+    h += '<button data-action="open-add-log" data-meal="' + meal.key + '" style="width:32px;height:32px;flex-shrink:0;padding:0;line-height:1;border-radius:50%;background:var(--surface-raised);border:1px solid var(--border-strong);color:var(--text);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;">+</button>'
+    h += '</div>'
     if (entries.length > 0) {
       entries
         .slice()
@@ -379,7 +387,7 @@ function renderIngredients() {
 
   let h = '<header class="top" style="display:flex;align-items:center;justify-content:space-between;">'
   h += '<h1>Ingrédients</h1>'
-  h += '<button data-action="open-add-ing" style="width:40px;height:40px;flex-shrink:0;padding:0;line-height:1;border-radius:50%;background:var(--protein);color:#221705;border:none;font-size:22px;font-weight:500;display:flex;align-items:center;justify-content:center;cursor:pointer;">+</button>'
+  h += '<button data-action="open-add-ing" style="width:40px;height:40px;flex-shrink:0;padding:0;line-height:1;border-radius:50%;background:var(--surface-raised);color:var(--text);border:1px solid var(--border-strong);font-size:22px;font-weight:500;display:flex;align-items:center;justify-content:center;cursor:pointer;">+</button>'
   h += '</header>'
   h += '<section>'
   const isFilterActive = state.ingViewMode === 'alphabetical' || (state.ingVisibleCategories !== null) || state.ingFavoritesOnly
