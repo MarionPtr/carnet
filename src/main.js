@@ -292,16 +292,14 @@ function renderToday() {
   MEALS.forEach(meal => {
     const entries = state.logs.filter(log => (log.meal || 'snacks') === meal.key)
     h += '<div class="card">'
-    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><h3 style="margin:0;">' + meal.label + '</h3><button class="icon-btn" data-action="open-add-log" data-meal="' + meal.key + '">+</button></div>'
-    if (entries.length === 0) {
-      h += '<div class="empty">Rien pour l\'instant.</div>'
-    } else {
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><h3 style="margin:0;">' + meal.label + '</h3><button data-action="open-add-log" data-meal="' + meal.key + '" style="width:32px;height:32px;flex-shrink:0;padding:0;line-height:1;border-radius:50%;background:var(--surface-raised);border:1px solid var(--border-strong);color:var(--text);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;">+</button></div>'
+    if (entries.length > 0) {
       entries
         .slice()
         .reverse()
         .forEach(log => {
-          h += '<div class="list-item">'
-          h += '<div><div class="name">' + esc(log.name) + '</div><div class="sub">' + round(log.kcal) + ' kcal · ' + round(log.protein) + 'g P · ' + round(log.carbs) + 'g G · ' + round(log.fat) + 'g L</div></div>'
+          h += '<div class="list-item" style="padding-left:20px;">'
+          h += '<div><div class="name" style="font-size:var(--text-small);">' + esc(log.name) + '</div><div class="sub" style="font-size:var(--text-caption);">' + round(log.kcal) + ' kcal · ' + round(log.protein) + 'g P · ' + round(log.carbs) + 'g G · ' + round(log.fat) + 'g L</div></div>'
           h += '<div class="actions"><button class="icon-btn" data-action="del-log" data-id="' + log.id + '">✕</button></div>'
           h += '</div>'
         })
