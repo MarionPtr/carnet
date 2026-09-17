@@ -83,6 +83,13 @@ section{ padding:6px 18px 18px; }
 .macro-row .bar-fill{ height:100%; border-radius:5px; transition:width .35s ease; }
 .macro-row .amt{ width:96px; text-align:right; font-size:var(--text-small); color:var(--text); flex-shrink:0; font-variant-numeric:tabular-nums; }
 
+.macro-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:14px; }
+.macro-tile{ background:var(--surface-raised); border:1px solid var(--border); border-radius:12px; padding:12px; min-width:0; }
+.macro-tile .mt-title{ font-size:var(--text-h3); font-weight:600; margin-bottom:6px; }
+.macro-tile .mt-value{ font-size:var(--text-small); color:var(--text-muted); font-variant-numeric:tabular-nums; margin-bottom:10px; }
+.macro-tile .bar-track{ height:6px; border-radius:4px; background:var(--track-bg); overflow:hidden; }
+.macro-tile .bar-fill{ height:100%; border-radius:4px; transition:width .35s ease; }
+
 .kcal-hero{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:4px; }
 .kcal-hero .num{ font-size:var(--text-display); font-weight:700; }
 .kcal-hero .target{ color:var(--text-muted); font-size:var(--text-small); }

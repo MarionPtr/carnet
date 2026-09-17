@@ -264,9 +264,11 @@ function renderToday() {
   h += '<div class="card">'
   h += '<div class="kcal-hero"><span class="num">' + round(totals.kcal) + ' <span style="font-size:var(--text-small);color:var(--text-muted);font-weight:400;">kcal</span></span><span class="target">objectif ' + targets.kcal + '</span></div>'
   h += '<div class="macro-row"><span class="label">&nbsp;</span><div class="bar-track"><div class="bar-fill" style="width:' + (pct * 100) + '%;background:var(--kcal)"></div></div><span class="amt"></span></div>'
-  h += macroRow('Protéines', totals.protein, targets.protein, 'var(--protein)')
-  h += macroRow('Glucides', totals.carbs, targets.carbs, 'var(--carbs)')
-  h += macroRow('Lipides', totals.fat, targets.fat, 'var(--fat)')
+  h += '<div class="macro-grid">'
+  h += macroTile('Protéines', totals.protein, targets.protein, 'var(--protein)')
+  h += macroTile('Glucides', totals.carbs, targets.carbs, 'var(--carbs)')
+  h += macroTile('Lipides', totals.fat, targets.fat, 'var(--fat)')
+  h += '</div>'
   h += '</div>'
   h += '<div class="row2" style="margin-bottom:12px;"><button class="btn primary block" data-action="open-add-log">+ Ajouter au journal</button></div>'
   h += '<div class="card"><h3 style="margin:0 0 8px;">' + (isToday ? 'Journal du jour' : 'Journal du ' + formatDateFR(parseLocalDate(state.currentDate))) + '</h3>'
@@ -289,9 +291,9 @@ function renderToday() {
   return h
 }
 
-function macroRow(label, val, target, color) {
+function macroTile(label, val, target, color) {
   const pct = clamp(val / Math.max(1, target), 0, 1)
-  return `<div class="macro-row"><span class="label">${label}</span><div class="bar-track"><div class="bar-fill" style="width:${pct * 100}%;background:${color}"></div></div><span class="amt">${round(val)} / ${round(target)}g</span></div>`
+  return `<div class="macro-tile"><div class="mt-title">${label}</div><div class="mt-value">${round(val)}/${round(target)}g</div><div class="bar-track"><div class="bar-fill" style="width:${pct * 100}%;background:${color}"></div></div></div>`
 }
 
 function datePickerForm() {
