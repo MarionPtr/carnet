@@ -86,7 +86,8 @@ const state = {
   logType: 'recipe',
   logMeal: 'petit-dej',
   logIngId: null,
-  logGramsMode: 'custom', // 'custom' ou 'portion'
+  logPortionIdx: null, // null = grammes personnalisés, sinon index dans getIngredientPortions(ing)
+  _ingDetailPortionIdx: null,
   _draftIngredient: null,
   _draftRecipe: null,
   categories: []
@@ -665,7 +666,7 @@ function renderModal() {
 function ingredientForm(editId) {
   const ing = editId
     ? state.ingredients.find(i => i.id === editId)
-    : { name: '', kcal: '', protein: '', carbs: '', fat: '', saturated_fat: '', fiber: '', sugar: '', salt: '', brands: [], photo: '', serving_size: '', serving_size_grams: '', unit: 'g' }
+    : { name: '', kcal: '', protein: '', carbs: '', fat: '', saturated_fat: '', fiber: '', sugar: '', salt: '', brands: [], photo: '', serving_size: '', serving_size_grams: '', extra_portions: [], unit: 'g' }
 
   if (!state._draftIngredient) {
     state._draftIngredient = { ...ing }
@@ -716,6 +717,24 @@ function ingredientForm(editId) {
   h += '<label class="field"><span class="lbl">Nom de la portion</span><input id="f-serving-size" value="' + esc(draft.serving_size || '') + '" placeholder="ex. 1 yaourt, 1 tranche"/></label>'
   h += '<label class="field"><span class="lbl">Poids (g)</span><input type="number" id="f-serving-size-grams" value="' + (draft.serving_size_grams || '') + '" placeholder="ex. 125"/></label>'
   h += '</div>'
+
+  h += '<label class="field"><span class="lbl">Portions supplémentaires</span>'
+  h += '<div style="margin-bottom:8px;">'
+  if (draft.extra_portions && draft.extra_portions.length > 0) {
+    draft.extra_portions.forEach((p, idx) => {
+      h += '<div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">'
+      h += '<span style="flex:1;padding:8px;background:var(--surface-raised);border-radius:6px;font-size:var(--text-small);">' + esc(p.name) + ' (' + p.grams + 'g)</span>'
+      h += '<button class="icon-btn" data-action="rm-extra-portion" data-idx="' + idx + '">✕</button>'
+      h += '</div>'
+    })
+  }
+  h += '</div>'
+  h += '<div style="display:flex;gap:6px;">'
+  h += '<input id="f-extra-portion-name" placeholder="ex. 1 boîte" style="flex:1;"/>'
+  h += '<input id="f-extra-portion-grams" type="number" placeholder="g" style="width:80px;"/>'
+  h += '<button class="btn small" data-action="add-extra-portion">+</button>'
+  h += '</div>'
+  h += '</label>'
 
   // Séparateur avant la partie valeurs nutritionnelles
   h += '<div style="border-top:1px solid var(--border);margin:16px 0;"></div>'
@@ -839,15 +858,20 @@ function addLogForm() {
       })
       h += '</select></label>'
 
-      if (selectedIng && selectedIng.serving_size_grams) {
-        h += '<div class="segmented" style="margin-bottom:10px;">'
-        h += '<button type="button" class="' + (state.logGramsMode !== 'portion' ? 'active' : '') + '" data-action="set-log-grams-mode" data-mode="custom">Grammes</button>'
-        h += '<button type="button" class="' + (state.logGramsMode === 'portion' ? 'active' : '') + '" data-action="set-log-grams-mode" data-mode="portion">Portions (' + selectedIng.serving_size_grams + 'g)</button>'
+      const logPortions = selectedIng ? getIngredientPortions(selectedIng) : []
+      const activeLogPortion = (state.logPortionIdx != null && logPortions[state.logPortionIdx]) ? logPortions[state.logPortionIdx] : null
+
+      if (logPortions.length > 0) {
+        h += '<div class="segmented" style="margin-bottom:10px;flex-wrap:wrap;">'
+        h += '<button type="button" class="' + (!activeLogPortion ? 'active' : '') + '" data-action="set-log-portion" data-idx="-1">Grammes</button>'
+        logPortions.forEach((p, idx) => {
+          h += '<button type="button" class="' + (state.logPortionIdx === idx ? 'active' : '') + '" data-action="set-log-portion" data-idx="' + idx + '">' + esc(p.name) + ' (' + p.grams + 'g)</button>'
+        })
         h += '</div>'
       }
 
-      if (selectedIng && selectedIng.serving_size_grams && state.logGramsMode === 'portion') {
-        h += '<label class="field"><span class="lbl">Nombre de portions</span><input type="number" id="log-portions" value="1" step="0.5" min="0.25"/></label>'
+      if (activeLogPortion) {
+        h += '<label class="field"><span class="lbl">Nombre de ' + esc(activeLogPortion.name) + '</span><input type="number" id="log-portions" value="1" step="0.5" min="0.25"/></label>'
       } else {
         h += '<label class="field"><span class="lbl">Quantité (' + (selectedIng.unit || 'g') + ')</span><input type="number" id="log-grams" value="100"/></label>'
       }
@@ -939,6 +963,17 @@ function editCategoryForm(idx) {
   return h
 }
 
+function getIngredientPortions(ing) {
+  const list = []
+  if (ing.serving_size_grams) {
+    list.push({ name: ing.serving_size || '1 portion', grams: ing.serving_size_grams })
+  }
+  ;(ing.extra_portions || []).forEach(p => {
+    if (p && p.grams) list.push({ name: p.name || '1 portion', grams: p.grams })
+  })
+  return list
+}
+
 function ingredientDetailModal(ingId) {
   const ing = state.ingredients.find(i => i.id === ingId)
   if (!ing) return ''
@@ -959,11 +994,11 @@ function ingredientDetailModal(ingId) {
   h += '<button data-action="toggle-favorite" data-id="' + ing.id + '" style="background:none;border:none;cursor:pointer;font-size:22px;line-height:1;padding:2px;color:' + (ing.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (ing.is_favorite ? '★' : '☆') + '</button>'
   h += '</div>'
 
+  const portions = getIngredientPortions(ing)
+
   // Serving size
-  if (ing.serving_size || ing.serving_size_grams) {
-    let label = 'Portion : '
-    if (ing.serving_size) label += esc(ing.serving_size)
-    if (ing.serving_size_grams) label += (ing.serving_size ? ' ' : '') + '(' + ing.serving_size_grams + 'g)'
+  if (portions.length > 0) {
+    const label = 'Portion' + (portions.length > 1 ? 's' : '') + ' : ' + portions.map(p => esc(p.name) + ' (' + p.grams + 'g)').join(' · ')
     h += '<div style="color:var(--text-muted);font-size:var(--text-small);margin-bottom:12px;font-weight:500;">' + label + '</div>'
   }
 
@@ -975,21 +1010,23 @@ function ingredientDetailModal(ingId) {
     h += '<div style="color:var(--text-muted);font-size:var(--text-small);margin-bottom:16px;">' + ing.brands.join(', ') + '</div>'
   }
 
-  // Toggle 100g / portion
-  const showPortion = !!ing.serving_size_grams && state._ingDetailMode === 'portion'
-  const factor = showPortion ? ing.serving_size_grams / 100 : 1
+  // Toggle 100g / portion(s)
+  const activePortion = (state._ingDetailPortionIdx != null && portions[state._ingDetailPortionIdx]) ? portions[state._ingDetailPortionIdx] : null
+  const factor = activePortion ? activePortion.grams / 100 : 1
+  const ingUnit = ing.unit || 'g'
 
-  if (ing.serving_size_grams) {
-    h += '<div class="segmented" style="margin-bottom:12px;">'
-    h += '<button type="button" class="' + (!showPortion ? 'active' : '') + '" data-action="set-ing-detail-mode" data-mode="100g">Pour 100g</button>'
-    h += '<button type="button" class="' + (showPortion ? 'active' : '') + '" data-action="set-ing-detail-mode" data-mode="portion">' + (ing.serving_size ? esc(ing.serving_size) : 'Pour 1 portion') + '</button>'
+  if (portions.length > 0) {
+    h += '<div class="segmented" style="margin-bottom:12px;flex-wrap:wrap;">'
+    h += '<button type="button" class="' + (!activePortion ? 'active' : '') + '" data-action="set-ing-detail-portion" data-idx="-1">Pour 100 ' + ingUnit + '</button>'
+    portions.forEach((p, idx) => {
+      h += '<button type="button" class="' + (state._ingDetailPortionIdx === idx ? 'active' : '') + '" data-action="set-ing-detail-portion" data-idx="' + idx + '">' + esc(p.name) + '</button>'
+    })
     h += '</div>'
   }
 
   // Macros en listing (style étiquette)
   h += '<div class="card" style="background:var(--surface-raised);padding:14px;margin-bottom:16px;">'
-  const ingUnit = ing.unit || 'g'
-  h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Valeurs nutritionnelles ' + (showPortion ? 'pour ' + (ing.serving_size ? esc(ing.serving_size) : '1 portion') + ' (' + ing.serving_size_grams + 'g)' : 'pour 100 ' + ingUnit) + '</div>'
+  h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Valeurs nutritionnelles ' + (activePortion ? 'pour ' + esc(activePortion.name) + ' (' + activePortion.grams + 'g)' : 'pour 100 ' + ingUnit) + '</div>'
 
   // Ligne principale : kcal
   h += '<div style="border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:10px;">'
@@ -1147,7 +1184,7 @@ function bindEvents() {
   if (logIngSelect) {
     logIngSelect.addEventListener('change', () => {
       state.logIngId = logIngSelect.value
-      state.logGramsMode = 'custom'
+      state.logPortionIdx = null
       render()
     })
   }
@@ -1374,11 +1411,12 @@ function handleAction(action, el) {
     state.modal = { type: 'settings' }
     render()
   } else if (action === 'view-ing') {
-    state._ingDetailMode = '100g'
+    state._ingDetailPortionIdx = null
     state.modal = { type: 'ing-detail', ingId: el.getAttribute('data-id') }
     render()
-  } else if (action === 'set-ing-detail-mode') {
-    state._ingDetailMode = el.getAttribute('data-mode')
+  } else if (action === 'set-ing-detail-portion') {
+    const idx = parseInt(el.getAttribute('data-idx'))
+    state._ingDetailPortionIdx = idx === -1 ? null : idx
     render()
   } else if (action === 'open-add-ing') {
     state._draftIngredient = null
@@ -1410,6 +1448,24 @@ function handleAction(action, el) {
     if (!state._draftIngredient) return
     const idx = parseInt(el.getAttribute('data-idx'))
     state._draftIngredient.brands.splice(idx, 1)
+    render()
+  } else if (action === 'add-extra-portion') {
+    if (!state._draftIngredient) state._draftIngredient = {}
+    const nameInput = document.getElementById('f-extra-portion-name')
+    const gramsInput = document.getElementById('f-extra-portion-grams')
+    const name = nameInput.value.trim()
+    const grams = parseFloat(gramsInput.value)
+    if (!name || !grams) {
+      showToast('Donne un nom et un poids pour la portion')
+      return
+    }
+    if (!state._draftIngredient.extra_portions) state._draftIngredient.extra_portions = []
+    state._draftIngredient.extra_portions.push({ name, grams })
+    render()
+  } else if (action === 'rm-extra-portion') {
+    if (!state._draftIngredient) return
+    const idx = parseInt(el.getAttribute('data-idx'))
+    state._draftIngredient.extra_portions.splice(idx, 1)
     render()
   } else if (action === 'save-ing') {
     const editId = el.getAttribute('data-id')
@@ -1448,6 +1504,7 @@ function handleAction(action, el) {
         category: category,
         serving_size: document.getElementById('f-serving-size').value.trim(),
         serving_size_grams: parseFloat(document.getElementById('f-serving-size-grams').value) || null,
+        extra_portions: state._draftIngredient?.extra_portions || [],
         kcal: parseFloat(document.getElementById('f-kcal').value) || 0,
         protein: parseFloat(document.getElementById('f-protein').value) || 0,
         carbs: parseFloat(document.getElementById('f-carbs').value) || 0,
@@ -1525,13 +1582,14 @@ function handleAction(action, el) {
     state.logMeal = defaultMealForNow()
     logRecipe(rid2, 1)
     showToast('Ajouté au journal')
-  } else if (action === 'set-log-grams-mode') {
-    state.logGramsMode = el.getAttribute('data-mode')
+  } else if (action === 'set-log-portion') {
+    const idx = parseInt(el.getAttribute('data-idx'))
+    state.logPortionIdx = idx === -1 ? null : idx
     render()
   } else if (action === 'open-add-log') {
     state.logType = 'recipe'
     state.logIngId = null
-    state.logGramsMode = 'custom'
+    state.logPortionIdx = null
     state.logMeal = el.getAttribute('data-meal') || defaultMealForNow()
     state.modal = { type: 'add-log' }
     render()
@@ -1545,10 +1603,12 @@ function handleAction(action, el) {
   } else if (action === 'confirm-log-ing') {
     const iid = document.getElementById('log-ing').value
     let grams
-    if (state.logGramsMode === 'portion') {
+    if (state.logPortionIdx != null) {
       const ing = state.ingredients.find(i => i.id === iid)
-      const portions = parseFloat(document.getElementById('log-portions').value) || 0
-      grams = portions * (ing.serving_size_grams || 0)
+      const portions = getIngredientPortions(ing)
+      const p = portions[state.logPortionIdx]
+      const count = parseFloat(document.getElementById('log-portions').value) || 0
+      grams = count * (p ? p.grams : 0)
     } else {
       grams = parseFloat(document.getElementById('log-grams').value) || 0
     }
