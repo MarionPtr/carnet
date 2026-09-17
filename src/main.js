@@ -286,7 +286,6 @@ function renderToday() {
   h += macroTile('Lipides', totals.fat, targets.fat, 'var(--fat)')
   h += '</div>'
   h += '</div>'
-  h += '<div class="row2" style="margin-bottom:12px;"><button class="btn primary block" data-action="open-add-log">+ Ajouter au journal</button></div>'
   h += '<h2 style="margin:20px 0 12px;">' + (isToday ? 'Repas' : 'Repas du ' + formatDateFR(parseLocalDate(state.currentDate))) + '</h2>'
 
   MEALS.forEach(meal => {
