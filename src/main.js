@@ -37,6 +37,21 @@ const AUTH_STORAGE_KEY = 'carnet_authenticated'
 const THEME_STORAGE_KEY = 'carnet_theme'
 const PERSON_STORAGE_KEY = 'carnet_person'
 
+const MEALS = [
+  { key: 'petit-dej', label: 'Petit-déjeuner' },
+  { key: 'dejeuner', label: 'Déjeuner' },
+  { key: 'diner', label: 'Dîner' },
+  { key: 'snacks', label: 'Snacks' }
+]
+
+function defaultMealForNow() {
+  const h = new Date().getHours()
+  if (h < 11) return 'petit-dej'
+  if (h < 15) return 'dejeuner'
+  if (h < 19) return 'snacks'
+  return 'diner'
+}
+
 const systemThemeQuery = window.matchMedia('(prefers-color-scheme: light)')
 
 function applyTheme(theme) {
@@ -69,6 +84,7 @@ const state = {
   ingVisibleCategories: null, // null = toutes visibles, sinon tableau de catégories cochées
   ingFavoritesOnly: false,
   logType: 'recipe',
+  logMeal: 'petit-dej',
   logIngId: null,
   logGramsMode: 'custom', // 'custom' ou 'portion'
   _draftIngredient: null,
@@ -271,23 +287,29 @@ function renderToday() {
   h += '</div>'
   h += '</div>'
   h += '<div class="row2" style="margin-bottom:12px;"><button class="btn primary block" data-action="open-add-log">+ Ajouter au journal</button></div>'
-  h += '<div class="card"><h3 style="margin:0 0 8px;">' + (isToday ? 'Journal du jour' : 'Journal du ' + formatDateFR(parseLocalDate(state.currentDate))) + '</h3>'
+  h += '<h2 style="margin:20px 0 12px;">' + (isToday ? 'Repas' : 'Repas du ' + formatDateFR(parseLocalDate(state.currentDate))) + '</h2>'
 
-  if (state.logs.length === 0) {
-    h += '<div class="empty">Rien de mangé pour l\'instant. Ajoute une recette ou un ingrédient.</div>'
-  } else {
-    state.logs
-      .slice()
-      .reverse()
-      .forEach(log => {
-        h += '<div class="list-item">'
-        h += '<div><div class="name">' + esc(log.name) + '</div><div class="sub">' + round(log.kcal) + ' kcal · ' + round(log.protein) + 'g P · ' + round(log.carbs) + 'g G · ' + round(log.fat) + 'g L</div></div>'
-        h += '<div class="actions"><button class="icon-btn" data-action="del-log" data-id="' + log.id + '">✕</button></div>'
-        h += '</div>'
-      })
-  }
+  MEALS.forEach(meal => {
+    const entries = state.logs.filter(log => (log.meal || 'snacks') === meal.key)
+    h += '<div class="card">'
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><h3 style="margin:0;">' + meal.label + '</h3><button class="icon-btn" data-action="open-add-log" data-meal="' + meal.key + '">+</button></div>'
+    if (entries.length === 0) {
+      h += '<div class="empty">Rien pour l\'instant.</div>'
+    } else {
+      entries
+        .slice()
+        .reverse()
+        .forEach(log => {
+          h += '<div class="list-item">'
+          h += '<div><div class="name">' + esc(log.name) + '</div><div class="sub">' + round(log.kcal) + ' kcal · ' + round(log.protein) + 'g P · ' + round(log.carbs) + 'g G · ' + round(log.fat) + 'g L</div></div>'
+          h += '<div class="actions"><button class="icon-btn" data-action="del-log" data-id="' + log.id + '">✕</button></div>'
+          h += '</div>'
+        })
+    }
+    h += '</div>'
+  })
 
-  h += '</div></section>'
+  h += '</section>'
   return h
 }
 
@@ -776,6 +798,11 @@ function recipeForm(editId) {
 
 function addLogForm() {
   let h = '<h2>Ajouter au journal</h2>'
+  h += '<label class="field"><span class="lbl">Repas</span><select id="log-meal">'
+  MEALS.forEach(meal => {
+    h += '<option value="' + meal.key + '" ' + (state.logMeal === meal.key ? 'selected' : '') + '>' + meal.label + '</option>'
+  })
+  h += '</select></label>'
   h += '<div class="segmented" id="log-type" style="margin-bottom:14px;">'
   h += '<button type="button" class="' + (state.logType !== 'ingredient' ? 'active' : '') + '" data-logtype="recipe">Recette</button>'
   h += '<button type="button" class="' + (state.logType === 'ingredient' ? 'active' : '') + '" data-logtype="ingredient">Ingrédient</button>'
@@ -1078,6 +1105,14 @@ function bindEvents() {
       state.profile.use_custom = true
       customMacrosDiv.style.display = 'block'
       saveProfile(state.profile)
+    })
+  }
+
+  // Log meal select
+  const logMealSelect = document.getElementById('log-meal')
+  if (logMealSelect) {
+    logMealSelect.addEventListener('change', () => {
+      state.logMeal = logMealSelect.value
     })
   }
 
@@ -1402,6 +1437,7 @@ function handleAction(action, el) {
     showToast('Recette enregistrée')
   } else if (action === 'log-recipe-quick') {
     const rid2 = el.getAttribute('data-id')
+    state.logMeal = defaultMealForNow()
     logRecipe(rid2, 1)
     showToast('Ajouté au journal')
   } else if (action === 'set-log-grams-mode') {
@@ -1411,6 +1447,7 @@ function handleAction(action, el) {
     state.logType = 'recipe'
     state.logIngId = null
     state.logGramsMode = 'custom'
+    state.logMeal = el.getAttribute('data-meal') || defaultMealForNow()
     state.modal = { type: 'add-log' }
     render()
   } else if (action === 'confirm-log-recipe') {
@@ -1515,6 +1552,7 @@ function logRecipe(recipeId, servings) {
     person_id: state.currentPerson,
     kind: 'recipe',
     ref_id: r.id,
+    meal: state.logMeal,
     name: r.name + ' (' + servings + ' part.)',
     kcal: m.kcal * servings,
     protein: m.protein * servings,
@@ -1536,6 +1574,7 @@ function logIngredient(ingId, grams) {
     person_id: state.currentPerson,
     kind: 'ingredient',
     ref_id: i.id,
+    meal: state.logMeal,
     name: i.name + ' (' + grams + 'g)',
     kcal: i.kcal * f,
     protein: i.protein * f,
