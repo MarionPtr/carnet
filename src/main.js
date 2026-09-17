@@ -666,10 +666,10 @@ function renderModal() {
 function ingredientForm(editId) {
   const ing = editId
     ? state.ingredients.find(i => i.id === editId)
-    : { name: '', kcal: '', protein: '', carbs: '', fat: '', saturated_fat: '', fiber: '', sugar: '', salt: '', brands: [], photo: '', serving_size: '', serving_size_grams: '', extra_portions: [], unit: 'g' }
+    : { name: '', kcal: '', protein: '', carbs: '', fat: '', saturated_fat: '', fiber: '', sugar: '', salt: '', brands: [], photo: '', portions: [], unit: 'g' }
 
   if (!state._draftIngredient) {
-    state._draftIngredient = { ...ing }
+    state._draftIngredient = { ...ing, portions: getIngredientPortions(ing) }
   }
   const draft = state._draftIngredient
 
@@ -713,27 +713,22 @@ function ingredientForm(editId) {
   h += '<div style="display:flex;gap:6px;"><input id="f-brand-input" placeholder="Ajouter une marque" style="flex:1;"/><button class="btn small" data-action="add-brand">+</button></div>'
   h += '</label>'
 
-  h += '<div class="row2">'
-  h += '<label class="field"><span class="lbl">Nom de la portion</span><input id="f-serving-size" value="' + esc(draft.serving_size || '') + '" placeholder="ex. 1 yaourt, 1 tranche"/></label>'
-  h += '<label class="field"><span class="lbl">Poids (g)</span><input type="number" id="f-serving-size-grams" value="' + (draft.serving_size_grams || '') + '" placeholder="ex. 125"/></label>'
-  h += '</div>'
-
-  h += '<label class="field"><span class="lbl">Portions supplémentaires</span>'
+  h += '<label class="field"><span class="lbl">Portions</span>'
   h += '<div style="margin-bottom:8px;">'
-  if (draft.extra_portions && draft.extra_portions.length > 0) {
-    draft.extra_portions.forEach((p, idx) => {
+  if (draft.portions && draft.portions.length > 0) {
+    draft.portions.forEach((p, idx) => {
       h += '<div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">'
       h += '<span style="flex:1;padding:8px;background:var(--surface-raised);border-radius:6px;font-size:var(--text-small);">' + esc(p.name) + ' (' + p.grams + 'g)</span>'
-      h += '<button class="icon-btn" data-action="rm-extra-portion" data-idx="' + idx + '">✕</button>'
+      h += '<button class="icon-btn" data-action="rm-portion" data-idx="' + idx + '">✕</button>'
       h += '</div>'
     })
   }
   h += '</div>'
-  h += '<div style="display:flex;gap:6px;">'
-  h += '<input id="f-extra-portion-name" placeholder="ex. 1 boîte" style="flex:1;"/>'
-  h += '<input id="f-extra-portion-grams" type="number" placeholder="g" style="width:80px;"/>'
-  h += '<button class="btn small" data-action="add-extra-portion">+</button>'
+  h += '<div class="row2" style="margin-bottom:8px;">'
+  h += '<input id="f-portion-name" placeholder="ex. 1 yaourt, 1 tranche"/>'
+  h += '<input type="number" id="f-portion-grams" placeholder="Poids (g)"/>'
   h += '</div>'
+  h += '<button class="btn small block" data-action="add-portion">+ Ajouter une portion</button>'
   h += '</label>'
 
   // Séparateur avant la partie valeurs nutritionnelles
@@ -964,6 +959,9 @@ function editCategoryForm(idx) {
 }
 
 function getIngredientPortions(ing) {
+  if (ing.portions && ing.portions.length > 0) return ing.portions
+
+  // Repli pour les ingrédients pas encore migrés vers le champ unifié "portions"
   const list = []
   if (ing.serving_size_grams) {
     list.push({ name: ing.serving_size || '1 portion', grams: ing.serving_size_grams })
@@ -1449,23 +1447,23 @@ function handleAction(action, el) {
     const idx = parseInt(el.getAttribute('data-idx'))
     state._draftIngredient.brands.splice(idx, 1)
     render()
-  } else if (action === 'add-extra-portion') {
+  } else if (action === 'add-portion') {
     if (!state._draftIngredient) state._draftIngredient = {}
-    const nameInput = document.getElementById('f-extra-portion-name')
-    const gramsInput = document.getElementById('f-extra-portion-grams')
+    const nameInput = document.getElementById('f-portion-name')
+    const gramsInput = document.getElementById('f-portion-grams')
     const name = nameInput.value.trim()
     const grams = parseFloat(gramsInput.value)
     if (!name || !grams) {
       showToast('Donne un nom et un poids pour la portion')
       return
     }
-    if (!state._draftIngredient.extra_portions) state._draftIngredient.extra_portions = []
-    state._draftIngredient.extra_portions.push({ name, grams })
+    if (!state._draftIngredient.portions) state._draftIngredient.portions = []
+    state._draftIngredient.portions.push({ name, grams })
     render()
-  } else if (action === 'rm-extra-portion') {
+  } else if (action === 'rm-portion') {
     if (!state._draftIngredient) return
     const idx = parseInt(el.getAttribute('data-idx'))
-    state._draftIngredient.extra_portions.splice(idx, 1)
+    state._draftIngredient.portions.splice(idx, 1)
     render()
   } else if (action === 'save-ing') {
     const editId = el.getAttribute('data-id')
@@ -1502,9 +1500,7 @@ function handleAction(action, el) {
         id: editId || uid(),
         name,
         category: category,
-        serving_size: document.getElementById('f-serving-size').value.trim(),
-        serving_size_grams: parseFloat(document.getElementById('f-serving-size-grams').value) || null,
-        extra_portions: state._draftIngredient?.extra_portions || [],
+        portions: state._draftIngredient?.portions || [],
         kcal: parseFloat(document.getElementById('f-kcal').value) || 0,
         protein: parseFloat(document.getElementById('f-protein').value) || 0,
         carbs: parseFloat(document.getElementById('f-carbs').value) || 0,
