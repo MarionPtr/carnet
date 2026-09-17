@@ -55,7 +55,6 @@ body{
   -webkit-font-smoothing:antialiased;
   overflow-x:hidden;
   overscroll-behavior-y:none;
-  touch-action:manipulation;
 }
 
 h1,h2,h3{ font-family:var(--font); margin:0; }

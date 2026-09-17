@@ -67,6 +67,7 @@ const state = {
   collapsedCategories: {},
   ingViewMode: 'category', // 'category' ou 'alphabetical'
   ingVisibleCategories: null, // null = toutes visibles, sinon tableau de catégories cochées
+  ingFavoritesOnly: false,
   logType: 'recipe',
   logIngId: null,
   logGramsMode: 'custom', // 'custom' ou 'portion'
@@ -337,7 +338,7 @@ function datePickerForm() {
 // ========== INGREDIENTS ==========
 function renderIngredients() {
   const q = state.ingSearch.toLowerCase()
-  const filtered = state.ingredients.filter(i => i.name.toLowerCase().indexOf(q) > -1)
+  const filtered = state.ingredients.filter(i => i.name.toLowerCase().indexOf(q) > -1 && (!state.ingFavoritesOnly || i.is_favorite))
 
   // Group by category
   const grouped = {}
@@ -359,7 +360,7 @@ function renderIngredients() {
   h += '<button data-action="open-add-ing" style="width:40px;height:40px;flex-shrink:0;padding:0;line-height:1;border-radius:50%;background:var(--protein);color:#221705;border:none;font-size:22px;font-weight:500;display:flex;align-items:center;justify-content:center;cursor:pointer;">+</button>'
   h += '</header>'
   h += '<section>'
-  const isFilterActive = state.ingViewMode === 'alphabetical' || (state.ingVisibleCategories !== null)
+  const isFilterActive = state.ingViewMode === 'alphabetical' || (state.ingVisibleCategories !== null) || state.ingFavoritesOnly
   h += '<div style="display:flex;gap:8px;">'
   h += '<div class="search-wrap" style="position:relative;flex:1;margin-bottom:0;">'
   h += '<input placeholder="Rechercher…" id="ing-search" value="' + esc(state.ingSearch) + '" style="' + (state.ingSearch ? 'padding-right:36px;' : '') + '"/>'
@@ -391,7 +392,7 @@ function renderIngredients() {
         h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h2);">🥘</div>'
       }
       h += '</div>'
-      h += '<div style="flex:1;"><div class="name" style="font-size:var(--text-h3);font-weight:600;">' + esc(i.name) + '</div></div>'
+      h += '<div style="flex:1;"><div class="name" style="font-size:var(--text-h3);font-weight:600;">' + (i.is_favorite ? '⭐ ' : '') + esc(i.name) + '</div></div>'
       h += '<div style="color:var(--text-muted);font-size:28px;line-height:1;flex-shrink:0;padding-left:6px;">›</div>'
       h += '</div>'
     })
@@ -421,7 +422,7 @@ function renderIngredients() {
           }
           h += '</div>'
           // Info
-          h += '<div style="flex:1;"><div class="name" style="font-size:var(--text-h3);font-weight:600;">' + esc(i.name) + '</div></div>'
+          h += '<div style="flex:1;"><div class="name" style="font-size:var(--text-h3);font-weight:600;">' + (i.is_favorite ? '⭐ ' : '') + esc(i.name) + '</div></div>'
           h += '<div style="color:var(--text-muted);font-size:28px;line-height:1;flex-shrink:0;padding-left:6px;">›</div>'
           h += '</div>'
         })
@@ -441,6 +442,11 @@ function ingFilterForm() {
   h += '<button type="button" class="' + (mode === 'category' ? 'active' : '') + '" data-action="set-ing-view-mode" data-mode="category">Par catégorie</button>'
   h += '<button type="button" class="' + (mode === 'alphabetical' ? 'active' : '') + '" data-action="set-ing-view-mode" data-mode="alphabetical">Liste alphabétique</button>'
   h += '</div>'
+
+  h += '<label class="list-item" style="cursor:pointer;margin-bottom:20px;">'
+  h += '<span>⭐ Favoris uniquement</span>'
+  h += '<input type="checkbox" data-action="toggle-fav-filter" style="width:auto;" ' + (state.ingFavoritesOnly ? 'checked' : '') + '/>'
+  h += '</label>'
 
   if (mode === 'category') {
     h += '<span class="lbl" style="display:block;margin-bottom:10px;">Catégories visibles</span>'
@@ -899,7 +905,10 @@ function ingredientDetailModal(ingId) {
   }
   h += '</div>'
 
-  h += '<h2 style="margin:0 0 4px;">' + esc(ing.name) + '</h2>'
+  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
+  h += '<h2 style="margin:0;">' + esc(ing.name) + '</h2>'
+  h += '<button data-action="toggle-favorite" data-id="' + ing.id + '" style="background:none;border:none;cursor:pointer;font-size:22px;line-height:1;padding:2px;color:' + (ing.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (ing.is_favorite ? '★' : '☆') + '</button>'
+  h += '</div>'
 
   // Serving size
   if (ing.serving_size || ing.serving_size_grams) {
@@ -1165,6 +1174,17 @@ function handleAction(action, el) {
   } else if (action === 'set-ing-view-mode') {
     state.ingViewMode = el.getAttribute('data-mode')
     render()
+  } else if (action === 'toggle-fav-filter') {
+    state.ingFavoritesOnly = el.checked
+    render()
+  } else if (action === 'toggle-favorite') {
+    const id = el.getAttribute('data-id')
+    const ing = state.ingredients.find(i => i.id === id)
+    if (ing) {
+      ing.is_favorite = !ing.is_favorite
+      saveIngredient(ing)
+      render()
+    }
   } else if (action === 'toggle-ing-visible-category') {
     const cat = el.getAttribute('data-cat')
     if (state.ingVisibleCategories === null) {
