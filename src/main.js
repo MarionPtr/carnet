@@ -432,7 +432,7 @@ function renderIngredients() {
       ? categories
       : categories.filter(cat => state.ingVisibleCategories.includes(cat))
     visibleCategories.forEach(cat => {
-      const isCollapsed = state.collapsedCategories[cat] !== false
+      const isCollapsed = !state.ingSearch && state.collapsedCategories[cat] !== false
       h += '<div data-action="toggle-category" data-cat="' + esc(cat) + '" style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px;cursor:pointer;">'
       h += '<h4 style="font-size:var(--text-h3);font-weight:700;margin:0;">' + esc(cat) + '</h4>'
       h += '<span style="color:var(--text-muted);display:inline-flex;padding:4px;transform:rotate(' + (isCollapsed ? '-90deg' : '0deg') + ');transition:transform .15s ease;">'
