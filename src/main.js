@@ -842,14 +842,15 @@ function addLogForm() {
       if (selectedIng && selectedIng.serving_size_grams) {
         h += '<div class="segmented" style="margin-bottom:10px;">'
         h += '<button type="button" class="' + (state.logGramsMode !== 'portion' ? 'active' : '') + '" data-action="set-log-grams-mode" data-mode="custom">Grammes</button>'
-        h += '<button type="button" class="' + (state.logGramsMode === 'portion' ? 'active' : '') + '" data-action="set-log-grams-mode" data-mode="portion">1 portion (' + selectedIng.serving_size_grams + 'g)</button>'
+        h += '<button type="button" class="' + (state.logGramsMode === 'portion' ? 'active' : '') + '" data-action="set-log-grams-mode" data-mode="portion">Portions (' + selectedIng.serving_size_grams + 'g)</button>'
         h += '</div>'
       }
 
-      const gramsValue = (selectedIng && selectedIng.serving_size_grams && state.logGramsMode === 'portion')
-        ? selectedIng.serving_size_grams
-        : 100
-      h += '<label class="field"><span class="lbl">Quantité (' + (selectedIng.unit || 'g') + ')</span><input type="number" id="log-grams" value="' + gramsValue + '" ' + (state.logGramsMode === 'portion' ? 'readonly' : '') + '/></label>'
+      if (selectedIng && selectedIng.serving_size_grams && state.logGramsMode === 'portion') {
+        h += '<label class="field"><span class="lbl">Nombre de portions</span><input type="number" id="log-portions" value="1" step="0.5" min="0.25"/></label>'
+      } else {
+        h += '<label class="field"><span class="lbl">Quantité (' + (selectedIng.unit || 'g') + ')</span><input type="number" id="log-grams" value="100"/></label>'
+      }
       h += '<button class="btn primary block" data-action="confirm-log-ing">Ajouter</button>'
     }
   }
@@ -981,14 +982,14 @@ function ingredientDetailModal(ingId) {
   if (ing.serving_size_grams) {
     h += '<div class="segmented" style="margin-bottom:12px;">'
     h += '<button type="button" class="' + (!showPortion ? 'active' : '') + '" data-action="set-ing-detail-mode" data-mode="100g">Pour 100g</button>'
-    h += '<button type="button" class="' + (showPortion ? 'active' : '') + '" data-action="set-ing-detail-mode" data-mode="portion">Pour 1 portion</button>'
+    h += '<button type="button" class="' + (showPortion ? 'active' : '') + '" data-action="set-ing-detail-mode" data-mode="portion">' + (ing.serving_size ? esc(ing.serving_size) : 'Pour 1 portion') + '</button>'
     h += '</div>'
   }
 
   // Macros en listing (style étiquette)
   h += '<div class="card" style="background:var(--surface-raised);padding:14px;margin-bottom:16px;">'
   const ingUnit = ing.unit || 'g'
-  h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Valeurs nutritionnelles ' + (showPortion ? 'pour la portion (' + ing.serving_size_grams + 'g)' : 'pour 100 ' + ingUnit) + '</div>'
+  h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Valeurs nutritionnelles ' + (showPortion ? 'pour ' + (ing.serving_size ? esc(ing.serving_size) : '1 portion') + ' (' + ing.serving_size_grams + 'g)' : 'pour 100 ' + ingUnit) + '</div>'
 
   // Ligne principale : kcal
   h += '<div style="border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:10px;">'
@@ -1543,7 +1544,14 @@ function handleAction(action, el) {
     showToast('Ajouté au journal')
   } else if (action === 'confirm-log-ing') {
     const iid = document.getElementById('log-ing').value
-    const grams = parseFloat(document.getElementById('log-grams').value) || 0
+    let grams
+    if (state.logGramsMode === 'portion') {
+      const ing = state.ingredients.find(i => i.id === iid)
+      const portions = parseFloat(document.getElementById('log-portions').value) || 0
+      grams = portions * (ing.serving_size_grams || 0)
+    } else {
+      grams = parseFloat(document.getElementById('log-grams').value) || 0
+    }
     logIngredient(iid, grams)
     state.modal = null
     render()
