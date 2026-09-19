@@ -837,11 +837,20 @@ function recipeForm(editId) {
   } else {
     draft.items.forEach((it, idx) => {
       const ing = state.ingredients.find(i => i.id === it.ingredient_id)
+      const portions = ing ? getIngredientPortions(ing) : []
       h += '<div class="ing-line">'
       h += '<button type="button" class="btn small" style="flex:2;text-align:left;" data-action="open-recipe-ing-picker" data-idx="' + idx + '">' + (ing ? esc(ing.name) : 'Choisir un ingrédient') + '</button>'
       h += '<input type="number" placeholder="g" data-ridx="' + idx + '" data-field="grams" value="' + it.grams + '"/>'
       h += '<button class="icon-btn" data-action="rm-recipe-item" data-idx="' + idx + '">✕</button>'
       h += '</div>'
+      if (portions.length > 0) {
+        h += '<select data-portion-ridx="' + idx + '" style="margin:-4px 0 8px;font-size:var(--text-small);">'
+        h += '<option value="">Grammes personnalisés</option>'
+        portions.forEach(p => {
+          h += '<option value="' + p.grams + '">' + esc(p.name) + ' (' + p.grams + 'g)</option>'
+        })
+        h += '</select>'
+      }
     })
     h += '<button class="btn small" data-action="add-recipe-item" style="margin-bottom:14px;">+ Ajouter un ingrédient</button>'
   }
@@ -1314,6 +1323,16 @@ function bindEvents() {
       const idx = parseInt(inp.getAttribute('data-ridx'))
       const field = inp.getAttribute('data-field')
       state._draftRecipe.items[idx][field] = field === 'grams' ? parseFloat(inp.value) || 0 : inp.value
+      render()
+    })
+  })
+
+  // Recipe item portion quick-select
+  app.querySelectorAll('[data-portion-ridx]').forEach(sel => {
+    sel.addEventListener('change', () => {
+      if (!state._draftRecipe || !sel.value) return
+      const idx = parseInt(sel.getAttribute('data-portion-ridx'))
+      state._draftRecipe.items[idx].grams = parseFloat(sel.value)
       render()
     })
   })
