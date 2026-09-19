@@ -96,6 +96,7 @@ const state = {
   _draftRecipe: null,
   _recipeIngPickerIdx: null,
   _recipeIngPickerSearch: '',
+  _recipeIngPickerViewMode: 'alphabetical', // 'alphabetical' ou 'category'
   categories: [],
   recipeTypes: []
 }
@@ -1023,24 +1024,53 @@ function editRecipeTypeForm(idx) {
 
 function recipeIngPickerModal() {
   const q = state._recipeIngPickerSearch.toLowerCase()
-  const filtered = state.ingredients
-    .filter(i => i.name.toLowerCase().indexOf(q) > -1)
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name))
+  const categoryMode = state._recipeIngPickerViewMode === 'category'
+  const filtered = state.ingredients.filter(i => i.name.toLowerCase().indexOf(q) > -1)
 
   let h = '<h2>Choisir un ingrédient</h2>'
-  h += '<div class="search-wrap" style="position:relative;margin-bottom:14px;">'
+  h += '<div style="display:flex;gap:8px;margin-bottom:14px;">'
+  h += '<div class="search-wrap" style="position:relative;flex:1;margin-bottom:0;">'
   h += '<input placeholder="Rechercher…" id="recipe-ing-picker-search" value="' + esc(state._recipeIngPickerSearch) + '"/>'
   h += '</div>'
+  h += '<button data-action="toggle-recipe-ing-picker-view" title="Trier par catégorie" style="flex-shrink:0;width:44px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:' + (categoryMode ? 'var(--protein)' : 'var(--surface-raised)') + ';color:' + (categoryMode ? '#221705' : 'var(--text)') + ';border:1px solid var(--border-strong);cursor:pointer;">'
+  h += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="17" x2="14" y2="17"/></svg>'
+  h += '</button>'
+  h += '</div>'
+
+  const ingRow = (i, isLast) => {
+    let row = '<div class="list-item" style="cursor:pointer;padding:10px 12px;border-bottom:' + (isLast ? 'none' : '1px solid var(--border)') + ';" data-action="pick-recipe-ingredient" data-id="' + i.id + '">'
+    row += '<div style="flex:1;">' + (i.is_favorite ? '⭐ ' : '') + esc(i.name) + '</div>'
+    row += '</div>'
+    return row
+  }
 
   if (filtered.length === 0) {
     h += '<div class="empty">Aucun ingrédient trouvé.</div>'
-  } else {
-    h += '<div style="max-height:50vh;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;">'
-    filtered.forEach((i, idx) => {
-      h += '<div class="list-item" style="cursor:pointer;padding:10px 12px;border-bottom:' + (idx < filtered.length - 1 ? '1px solid var(--border)' : 'none') + ';" data-action="pick-recipe-ingredient" data-id="' + i.id + '">'
-      h += '<div style="flex:1;">' + (i.is_favorite ? '⭐ ' : '') + esc(i.name) + '</div>'
+  } else if (categoryMode) {
+    const grouped = {}
+    filtered.forEach(i => {
+      const cat = i.category || 'Sans catégorie'
+      if (!grouped[cat]) grouped[cat] = []
+      grouped[cat].push(i)
+    })
+    Object.keys(grouped).forEach(cat => grouped[cat].sort((a, b) => a.name.localeCompare(b.name)))
+    const categories = Object.keys(grouped).sort()
+
+    h += '<div style="max-height:55vh;overflow-y:auto;">'
+    categories.forEach(cat => {
+      h += '<h4 style="font-size:var(--text-h3);font-weight:700;margin:14px 0 8px;">' + esc(cat) + '</h4>'
+      h += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;">'
+      grouped[cat].forEach((i, idx) => {
+        h += ingRow(i, idx === grouped[cat].length - 1)
+      })
       h += '</div>'
+    })
+    h += '</div>'
+  } else {
+    const alphaList = filtered.slice().sort((a, b) => a.name.localeCompare(b.name))
+    h += '<div style="max-height:50vh;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;">'
+    alphaList.forEach((i, idx) => {
+      h += ingRow(i, idx === alphaList.length - 1)
     })
     h += '</div>'
   }
@@ -1697,6 +1727,9 @@ function handleAction(action, el) {
     state._recipeIngPickerIdx = parseInt(el.getAttribute('data-idx'))
     state._recipeIngPickerSearch = ''
     state.modal = { type: 'recipe-ing-picker' }
+    render()
+  } else if (action === 'toggle-recipe-ing-picker-view') {
+    state._recipeIngPickerViewMode = state._recipeIngPickerViewMode === 'category' ? 'alphabetical' : 'category'
     render()
   } else if (action === 'pick-recipe-ingredient') {
     if (state._draftRecipe && state._recipeIngPickerIdx != null) {
