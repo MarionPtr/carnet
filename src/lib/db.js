@@ -93,7 +93,7 @@ export async function saveRecipe(recipe) {
     const itemsWithRecipeId = items.map(item => ({
       id: uid(),
       recipe_id: recipe.id,
-      ingredient_id: item.ingredientId,
+      ingredient_id: item.ingredient_id,
       grams: item.grams
     }))
 
@@ -273,6 +273,69 @@ export async function deleteCategory(name) {
 
   if (error) {
     console.error('Erreur suppression catégorie:', error)
+    throw error
+  }
+}
+
+// Charger les types de recette
+export async function loadRecipeTypes() {
+  const { data, error } = await supabase
+    .from('recipe_types')
+    .select('*')
+    .order('name')
+
+  if (error) {
+    console.error('Erreur chargement types de recette:', error)
+    return []
+  }
+  return (data || []).map(t => t.name)
+}
+
+// Ajouter un type de recette
+export async function addRecipeType(name) {
+  const { error } = await supabase
+    .from('recipe_types')
+    .insert([{ name }])
+
+  if (error) {
+    console.error('Erreur ajout type de recette:', error)
+    throw error
+  }
+}
+
+// Renommer un type de recette
+export async function renameRecipeType(oldName, newName) {
+  const { error } = await supabase
+    .from('recipe_types')
+    .update({ name: newName })
+    .eq('name', oldName)
+
+  if (error) {
+    console.error('Erreur renommage type de recette:', error)
+    throw error
+  }
+
+  // Répercuter le renommage sur les recettes qui référencent l'ancien nom
+  const { error: recipeError } = await supabase
+    .from('recipes')
+    .update({ type: newName })
+    .eq('type', oldName)
+
+  if (recipeError) {
+    console.error('Erreur mise à jour type des recettes:', recipeError)
+    throw recipeError
+  }
+}
+
+// Supprimer un type de recette
+export async function deleteRecipeType(name) {
+  const { error } = await supabase
+    .from('recipe_types')
+    .delete()
+    .eq('name', name)
+
+  if (error) {
+    console.error('Erreur suppression type de recette:', error)
     throw error
   }
 }

@@ -15,7 +15,11 @@ import {
   loadCategories,
   addCategory,
   renameCategory,
-  deleteCategory
+  deleteCategory,
+  loadRecipeTypes,
+  addRecipeType,
+  renameRecipeType,
+  deleteRecipeType
 } from './lib/db'
 import {
   round,
@@ -90,7 +94,10 @@ const state = {
   _ingDetailPortionIdx: null,
   _draftIngredient: null,
   _draftRecipe: null,
-  categories: []
+  _recipeIngPickerIdx: null,
+  _recipeIngPickerSearch: '',
+  categories: [],
+  recipeTypes: []
 }
 
 // Initialisation
@@ -123,6 +130,7 @@ async function init() {
     state.profile = await loadProfile(state.currentPerson)
     state.logs = await loadLogs(state.currentDate, state.currentPerson)
     state.categories = await loadCategories()
+    state.recipeTypes = await loadRecipeTypes()
   } catch (e) {
     console.error('Erreur lors du chargement:', e)
   }
@@ -508,8 +516,17 @@ function renderRecipes() {
       .forEach(r => {
         const m = recipeMacrosPerServing(r, state.ingredients)
         h += '<div class="list-item">'
-        h += '<div><div class="name">' + esc(r.name) + '</div><div class="sub">' + r.servings + ' part. · ' + round(m.kcal) + ' kcal/part · <span class="pill protein">P ' + round(m.protein) + 'g</span> <span class="pill carbs">G ' + round(m.carbs) + 'g</span> <span class="pill fat">L ' + round(m.fat) + 'g</span></div></div>'
-        h += '<div class="actions"><button class="icon-btn" data-action="log-recipe-quick" data-id="' + r.id + '" title="Ajouter au journal">＋</button><button class="icon-btn" data-action="edit-recipe" data-id="' + r.id + '">✎</button><button class="icon-btn" data-action="del-recipe" data-id="' + r.id + '">✕</button></div>'
+        h += '<div style="width:48px;height:48px;flex-shrink:0;border-radius:10px;overflow:hidden;margin-right:12px;background:var(--surface-raised);border:1px solid var(--border);">'
+        h += r.photo
+          ? '<img src="' + esc(r.photo) + '" style="width:100%;height:100%;object-fit:cover;"/>'
+          : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h3);">🍽️</div>'
+        h += '</div>'
+        h += '<div style="flex:1;"><div class="name">' + esc(r.name) + (r.type ? ' <span class="pill" style="background:var(--surface-raised);color:var(--text-muted);">' + esc(r.type) + '</span>' : '') + '</div><div class="sub">' + r.servings + ' part. · ' + round(m.kcal) + ' kcal/part · <span class="pill protein">P ' + round(m.protein) + 'g</span> <span class="pill carbs">G ' + round(m.carbs) + 'g</span> <span class="pill fat">L ' + round(m.fat) + 'g</span></div></div>'
+        h += '<div class="actions">'
+        if (r.reference_url) {
+          h += '<a class="icon-btn" href="' + esc(r.reference_url) + '" target="_blank" rel="noopener" title="Recette de référence">🔗</a>'
+        }
+        h += '<button class="icon-btn" data-action="log-recipe-quick" data-id="' + r.id + '" title="Ajouter au journal">＋</button><button class="icon-btn" data-action="edit-recipe" data-id="' + r.id + '">✎</button><button class="icon-btn" data-action="del-recipe" data-id="' + r.id + '">✕</button></div>'
         h += '</div>'
       })
   }
@@ -592,6 +609,22 @@ function settingsForm() {
   h += '<button class="btn small" data-action="add-category">+</button>'
   h += '</div>'
 
+  // === TYPES DE RECETTE ===
+  h += '<h3 style="margin:0 0 12px;">Types de recette</h3>'
+  h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">'
+  state.recipeTypes.forEach((t, idx) => {
+    h += '<div style="display:flex;align-items:center;gap:4px;padding:6px 10px;background:var(--surface-raised);border-radius:8px;font-size:var(--text-small);">'
+    h += '<span>' + esc(t) + '</span>'
+    h += '<button class="icon-btn" data-action="edit-recipe-type" data-idx="' + idx + '" style="font-size:var(--text-small);padding:0;margin:0;opacity:0.6;">✎</button>'
+    h += '<button class="icon-btn" data-action="rm-recipe-type" data-idx="' + idx + '" style="font-size:var(--text-small);padding:0;margin:0;">✕</button>'
+    h += '</div>'
+  })
+  h += '</div>'
+  h += '<div style="display:flex;gap:6px;margin-bottom:24px;">'
+  h += '<input id="new-recipe-type-input" placeholder="Nouveau type" style="flex:1;"/>'
+  h += '<button class="btn small" data-action="add-recipe-type">+</button>'
+  h += '</div>'
+
   // === APPARENCE ===
   h += '<h3 style="margin:0 0 12px;">Apparence</h3>'
   h += '<div class="segmented" style="margin-bottom:24px;">'
@@ -653,6 +686,8 @@ function renderModal() {
   else if (m.type === 'date-picker') body = datePickerForm()
   else if (m.type === 'settings') body = settingsForm()
   else if (m.type === 'ing-filter') body = ingFilterForm()
+  else if (m.type === 'recipe-ing-picker') body = recipeIngPickerModal()
+  else if (m.type === 'edit-recipe-type') body = editRecipeTypeForm(m.typeIdx)
 
   return (
     '<div class="modal-backdrop" data-action="close-modal-bg">' +
@@ -762,11 +797,16 @@ function ingredientForm(editId) {
 
 function recipeForm(editId) {
   if (!state._draftRecipe || state._draftRecipe.__for !== editId) {
-    const r = editId ? state.recipes.find(x => x.id === editId) : { name: '', servings: 4, items: [] }
+    const r = editId
+      ? state.recipes.find(x => x.id === editId)
+      : { name: '', servings: 4, type: '', reference_url: '', photo: '', items: [] }
     state._draftRecipe = {
       __for: editId,
       name: r.name,
       servings: r.servings,
+      type: r.type || '',
+      reference_url: r.reference_url || '',
+      photo: r.photo || '',
       items: (r.items || []).map(i => ({ ingredient_id: i.ingredient_id, grams: i.grams }))
     }
   }
@@ -776,18 +816,28 @@ function recipeForm(editId) {
   let h = '<h2>' + (editId ? 'Modifier' : 'Nouvelle') + ' recette</h2>'
   h += '<label class="field"><span class="lbl">Nom</span><input id="rf-name" value="' + esc(draft.name) + '"/></label>'
   h += '<label class="field"><span class="lbl">Nombre de portions</span><input type="number" id="rf-servings" value="' + draft.servings + '" min="1"/></label>'
+
+  h += '<label class="field"><span class="lbl">Type</span><select id="rf-type">'
+  h += '<option value="">Sélectionner un type</option>'
+  state.recipeTypes.forEach(t => {
+    h += '<option value="' + t + '" ' + (draft.type === t ? 'selected' : '') + '>' + t + '</option>'
+  })
+  h += '<option value="__new__">+ Ajouter un type</option>'
+  h += '</select></label>'
+  h += '<input id="rf-new-type" type="text" placeholder="Nouveau type" style="display:none;margin-bottom:10px;"/>'
+
+  h += '<label class="field"><span class="lbl">Lien de la recette de référence</span><input id="rf-reference-url" value="' + esc(draft.reference_url) + '" placeholder="https://…"/></label>'
+  h += '<label class="field"><span class="lbl">Lien de la photo</span><input id="rf-photo-url" value="' + esc(draft.photo) + '" placeholder="https://…"/></label>'
+
   h += '<span class="lbl" style="display:block;margin-bottom:6px;">Ingrédients</span>'
 
   if (state.ingredients.length === 0) {
     h += '<div class="empty">Ajoute d\'abord des ingrédients.</div>'
   } else {
     draft.items.forEach((it, idx) => {
+      const ing = state.ingredients.find(i => i.id === it.ingredient_id)
       h += '<div class="ing-line">'
-      h += '<select data-ridx="' + idx + '" data-field="ingredient_id">'
-      state.ingredients.forEach(i => {
-        h += '<option value="' + i.id + '" ' + (i.id === it.ingredient_id ? 'selected' : '') + '>' + esc(i.name) + '</option>'
-      })
-      h += '</select>'
+      h += '<button type="button" class="btn small" style="flex:2;text-align:left;" data-action="open-recipe-ing-picker" data-idx="' + idx + '">' + (ing ? esc(ing.name) : 'Choisir un ingrédient') + '</button>'
       h += '<input type="number" placeholder="g" data-ridx="' + idx + '" data-field="grams" value="' + it.grams + '"/>'
       h += '<button class="icon-btn" data-action="rm-recipe-item" data-idx="' + idx + '">✕</button>'
       h += '</div>'
@@ -954,6 +1004,46 @@ function editCategoryForm(idx) {
   h += '<button class="btn primary block" data-action="save-category" data-idx="' + idx + '">Enregistrer</button>'
   h += '<button class="btn block" data-action="close-modal">Annuler</button>'
   h += '</div>'
+
+  return h
+}
+
+function editRecipeTypeForm(idx) {
+  const currentName = state.recipeTypes[idx]
+
+  let h = '<h2>Modifier le type</h2>'
+  h += '<label class="field"><span class="lbl">Nom</span><input id="edit-recipe-type-input" value="' + esc(currentName) + '"/></label>'
+  h += '<div class="row2">'
+  h += '<button class="btn primary block" data-action="save-recipe-type" data-idx="' + idx + '">Enregistrer</button>'
+  h += '<button class="btn block" data-action="close-modal">Annuler</button>'
+  h += '</div>'
+
+  return h
+}
+
+function recipeIngPickerModal() {
+  const q = state._recipeIngPickerSearch.toLowerCase()
+  const filtered = state.ingredients
+    .filter(i => i.name.toLowerCase().indexOf(q) > -1)
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  let h = '<h2>Choisir un ingrédient</h2>'
+  h += '<div class="search-wrap" style="position:relative;margin-bottom:14px;">'
+  h += '<input placeholder="Rechercher…" id="recipe-ing-picker-search" value="' + esc(state._recipeIngPickerSearch) + '"/>'
+  h += '</div>'
+
+  if (filtered.length === 0) {
+    h += '<div class="empty">Aucun ingrédient trouvé.</div>'
+  } else {
+    h += '<div style="max-height:50vh;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;">'
+    filtered.forEach((i, idx) => {
+      h += '<div class="list-item" style="cursor:pointer;padding:10px 12px;border-bottom:' + (idx < filtered.length - 1 ? '1px solid var(--border)' : 'none') + ';" data-action="pick-recipe-ingredient" data-id="' + i.id + '">'
+      h += '<div style="flex:1;">' + (i.is_favorite ? '⭐ ' : '') + esc(i.name) + '</div>'
+      h += '</div>'
+    })
+    h += '</div>'
+  }
 
   return h
 }
@@ -1245,6 +1335,68 @@ function bindEvents() {
           ? '<img src="' + esc(state._draftIngredient.photo) + '" style="width:100%;height:100%;object-fit:cover;"/>'
           : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h2);">📷</div>'
       }
+    })
+  }
+
+  // Recipe form fields - keep draft in sync so it survives a re-render (e.g. adding an ingredient line)
+  const rfName = document.getElementById('rf-name')
+  if (rfName) {
+    rfName.addEventListener('input', () => {
+      if (!state._draftRecipe) return
+      state._draftRecipe.name = rfName.value
+    })
+  }
+  const rfServings = document.getElementById('rf-servings')
+  if (rfServings) {
+    rfServings.addEventListener('input', () => {
+      if (!state._draftRecipe) return
+      state._draftRecipe.servings = rfServings.value
+    })
+  }
+  const rfReferenceUrl = document.getElementById('rf-reference-url')
+  if (rfReferenceUrl) {
+    rfReferenceUrl.addEventListener('input', () => {
+      if (!state._draftRecipe) return
+      state._draftRecipe.reference_url = rfReferenceUrl.value
+    })
+  }
+  const rfPhotoUrl = document.getElementById('rf-photo-url')
+  if (rfPhotoUrl) {
+    rfPhotoUrl.addEventListener('input', () => {
+      if (!state._draftRecipe) return
+      state._draftRecipe.photo = rfPhotoUrl.value
+    })
+  }
+
+  // Recipe type select
+  const rfTypeSelect = document.getElementById('rf-type')
+  const rfNewTypeInput = document.getElementById('rf-new-type')
+  if (rfTypeSelect) {
+    rfTypeSelect.addEventListener('change', () => {
+      if (rfTypeSelect.value === '__new__') {
+        rfNewTypeInput.style.display = 'block'
+        rfNewTypeInput.focus()
+      } else {
+        rfNewTypeInput.style.display = 'none'
+        if (!state._draftRecipe) state._draftRecipe = {}
+        state._draftRecipe.type = rfTypeSelect.value
+      }
+    })
+  }
+
+  // Recipe ingredient picker search
+  const recipeIngPickerSearch = document.getElementById('recipe-ing-picker-search')
+  if (recipeIngPickerSearch) {
+    recipeIngPickerSearch.addEventListener('input', () => {
+      state._recipeIngPickerSearch = recipeIngPickerSearch.value
+      render()
+      setTimeout(() => {
+        const el = document.getElementById('recipe-ing-picker-search')
+        if (el) {
+          el.focus()
+          el.selectionStart = el.selectionEnd = el.value.length
+        }
+      }, 0)
     })
   }
 }
@@ -1539,11 +1691,19 @@ function handleAction(action, el) {
     render()
   } else if (action === 'add-recipe-item') {
     if (!state._draftRecipe) return
-    const firstIng = state.ingredients[0]
-    if (firstIng) {
-      state._draftRecipe.items.push({ ingredient_id: firstIng.id, grams: 100 })
-      render()
+    state._draftRecipe.items.push({ ingredient_id: null, grams: 100 })
+    render()
+  } else if (action === 'open-recipe-ing-picker') {
+    state._recipeIngPickerIdx = parseInt(el.getAttribute('data-idx'))
+    state._recipeIngPickerSearch = ''
+    state.modal = { type: 'recipe-ing-picker' }
+    render()
+  } else if (action === 'pick-recipe-ingredient') {
+    if (state._draftRecipe && state._recipeIngPickerIdx != null) {
+      state._draftRecipe.items[state._recipeIngPickerIdx].ingredient_id = el.getAttribute('data-id')
     }
+    state.modal = { type: 'add-recipe', editId: state._draftRecipe ? state._draftRecipe.__for : null }
+    render()
   } else if (action === 'rm-recipe-item') {
     const idx = parseInt(el.getAttribute('data-idx'))
     state._draftRecipe.items.splice(idx, 1)
@@ -1555,12 +1715,31 @@ function handleAction(action, el) {
       showToast('Donne un nom à la recette')
       return
     }
-    const servings = parseInt(document.getElementById('rf-servings').value) || 1
     const draft = state._draftRecipe
+    if (draft.items.some(it => !it.ingredient_id)) {
+      showToast('Choisis un ingrédient pour chaque ligne')
+      return
+    }
+    const servings = parseInt(document.getElementById('rf-servings').value) || 1
+    let type = document.getElementById('rf-type').value
+    if (type === '__new__') {
+      type = document.getElementById('rf-new-type').value.trim()
+      if (!type) {
+        showToast('Donne un nom au nouveau type')
+        return
+      }
+      if (!state.recipeTypes.includes(type)) {
+        state.recipeTypes.push(type)
+        addRecipeType(type)
+      }
+    }
     const obj2 = {
       id: editId2 || uid(),
       name: name2,
       servings: servings,
+      type: type,
+      reference_url: document.getElementById('rf-reference-url').value.trim(),
+      photo: document.getElementById('rf-photo-url').value.trim(),
       items: draft.items
     }
     if (editId2) {
@@ -1673,9 +1852,58 @@ function handleAction(action, el) {
     state.categories.splice(idx, 1)
     deleteCategory(name)
     render()
-  } else if (action === 'close-modal' || action === 'close-modal-bg') {
+  } else if (action === 'add-recipe-type') {
+    const input = document.getElementById('new-recipe-type-input')
+    const type = input.value.trim()
+    if (!type) {
+      showToast('Saisis le nom du type')
+      return
+    }
+    if (!state.recipeTypes.includes(type)) {
+      state.recipeTypes.push(type)
+      addRecipeType(type)
+      input.value = ''
+      render()
+    } else {
+      showToast('Ce type existe déjà')
+    }
+  } else if (action === 'edit-recipe-type') {
+    const idx = parseInt(el.getAttribute('data-idx'))
+    state.modal = { type: 'edit-recipe-type', typeIdx: idx }
+    render()
+  } else if (action === 'save-recipe-type') {
+    const idx = parseInt(el.getAttribute('data-idx'))
+    const oldName = state.recipeTypes[idx]
+    const newName = document.getElementById('edit-recipe-type-input').value.trim()
+    if (!newName) {
+      showToast('Saisis un nom pour le type')
+      return
+    }
+    if (state.recipeTypes.includes(newName) && oldName !== newName) {
+      showToast('Ce type existe déjà')
+      return
+    }
+    state.recipeTypes[idx] = newName
+    state.recipes.forEach(r => {
+      if (r.type === oldName) r.type = newName
+    })
+    renameRecipeType(oldName, newName)
     state.modal = null
-    state._draftRecipe = null
+    render()
+    showToast('Type modifié')
+  } else if (action === 'rm-recipe-type') {
+    const idx = parseInt(el.getAttribute('data-idx'))
+    const name = state.recipeTypes[idx]
+    state.recipeTypes.splice(idx, 1)
+    deleteRecipeType(name)
+    render()
+  } else if (action === 'close-modal' || action === 'close-modal-bg') {
+    if (state.modal && state.modal.type === 'recipe-ing-picker') {
+      state.modal = { type: 'add-recipe', editId: state._draftRecipe ? state._draftRecipe.__for : null }
+    } else {
+      state.modal = null
+      state._draftRecipe = null
+    }
     render()
   }
 }
@@ -1727,8 +1955,12 @@ function logIngredient(ingId, grams) {
 // Click outside modal
 document.addEventListener('click', ev => {
   if (ev.target && ev.target.getAttribute && ev.target.getAttribute('data-action') === 'close-modal-bg') {
-    state.modal = null
-    state._draftRecipe = null
+    if (state.modal && state.modal.type === 'recipe-ing-picker') {
+      state.modal = { type: 'add-recipe', editId: state._draftRecipe ? state._draftRecipe.__for : null }
+    } else {
+      state.modal = null
+      state._draftRecipe = null
+    }
     render()
   }
 })
