@@ -1741,6 +1741,9 @@ function handleAction(action, el) {
   } else if (action === 'add-recipe-item') {
     if (!state._draftRecipe) return
     state._draftRecipe.items.push({ ingredient_id: null, grams: 100 })
+    state._recipeIngPickerIdx = state._draftRecipe.items.length - 1
+    state._recipeIngPickerSearch = ''
+    state.modal = { type: 'recipe-ing-picker' }
     render()
   } else if (action === 'open-recipe-ing-picker') {
     state._recipeIngPickerIdx = parseInt(el.getAttribute('data-idx'))
