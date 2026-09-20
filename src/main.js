@@ -213,7 +213,7 @@ function render() {
   else if (state.tab === 'recipes') html = renderRecipes()
   else if (state.tab === 'profile') html = renderProfile()
 
-  html += renderTabs()
+  if (state.tab !== 'profile') html += renderTabs()
   if (state.modal) html += renderModal()
   if (state.toastMsg) html += `<div class="toast">${esc(state.toastMsg)}</div>`
 
@@ -791,7 +791,11 @@ function renderProfile() {
   const p = state.profile
   const targets = computeTargets(p)
 
-  let h = '<header class="top" style="text-align:center;"><h1 style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Profil</h1></header>'
+  let h = '<header class="top" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+  h += '<button data-action="close-profile" title="Retour au journal" style="width:40px;height:40px;flex-shrink:0;padding:0;border-radius:50%;background:var(--surface-raised);color:var(--text);border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;cursor:pointer;"><span class="header-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></span></button>'
+  h += '<h1 style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;text-align:center;flex:1;">Profil</h1>'
+  h += '<div style="width:40px;flex-shrink:0;"></div>'
+  h += '</header>'
   h += '<section>'
 
   // === SECTION PROFIL ===
@@ -1903,6 +1907,10 @@ function handleAction(action, el) {
   } else if (action === 'set-custom-mode') {
     state.profile.custom_mode = el.getAttribute('data-mode')
     saveProfile(state.profile)
+    render()
+  } else if (action === 'close-profile') {
+    state.tab = 'today'
+    state.modal = null
     render()
   } else if (action === 'open-profile') {
     state.tab = 'profile'
