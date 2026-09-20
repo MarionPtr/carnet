@@ -847,10 +847,11 @@ function renderProfile() {
   h += '<div class="card">'
   h += '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">'
   h += '<div style="width:56px;height:56px;border-radius:50%;background:var(--surface-raised);display:flex;align-items:center;justify-content:center;font-size:var(--text-h1);flex-shrink:0;">👤</div>'
-  h += '<div>'
+  h += '<div style="flex:1;min-width:0;">'
   h += '<div style="font-size:var(--text-h3);font-weight:600;">' + esc(p.display_name || 'Sans nom') + '</div>'
   h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + (calculateAge(p.birthdate) ?? p.age) + ' ans</div>'
   h += '</div>'
+  h += '<button class="btn small" data-action="open-edit-profile" style="flex-shrink:0;">Edit</button>'
   h += '</div>'
 
   h += '<div style="border-top:1px solid var(--border);margin-bottom:4px;"></div>'
@@ -858,7 +859,6 @@ function renderProfile() {
   h += '<div class="list-item" style="font-size:var(--text-body);"><span>Poids actuel</span><span style="font-weight:600;">' + p.weight + ' kg</span></div>'
   h += '<div class="list-item" style="font-size:var(--text-body);"><span>Activité</span><span style="font-weight:600;">' + activityLabels[p.activity] + '</span></div>'
 
-  h += '<button class="btn primary block" data-action="open-edit-profile" style="margin-top:16px;">Modifier</button>'
   h += '</div>'
 
   // === SECTION OBJECTIFS ===
