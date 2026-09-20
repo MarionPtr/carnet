@@ -531,6 +531,9 @@ function renderIngredients() {
     const visibleCategories = state.ingVisibleCategories === null
       ? categories
       : categories.filter(cat => state.ingVisibleCategories.includes(cat))
+    if (visibleCategories.length === 0) {
+      h += '<div class="empty">Aucune catégorie sélectionnée. Ouvre le filtre pour en choisir.</div>'
+    }
     visibleCategories.forEach(cat => {
       const isCollapsed = !state.ingSearch && state.collapsedCategories[cat] !== false
       h += '<div data-action="toggle-category" data-cat="' + esc(cat) + '" style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px;cursor:pointer;">'
@@ -567,7 +570,11 @@ function ingFilterForm() {
   h += '</label>'
 
   if (state.ingViewMode === 'category') {
-    h += '<span class="lbl" style="display:block;margin-bottom:10px;">Catégories visibles</span>'
+    const allSelected = state.ingVisibleCategories === null
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
+    h += '<span class="lbl" style="margin:0;">Catégories visibles</span>'
+    h += '<button type="button" data-action="' + (allSelected ? 'ing-select-none' : 'ing-select-all') + '" style="background:none;border:none;color:var(--protein);font-size:var(--text-body);font-weight:600;padding:6px 0 6px 10px;cursor:pointer;">' + (allSelected ? 'Tout désélectionner' : 'Tout sélectionner') + '</button>'
+    h += '</div>'
     state.categories.forEach(cat => {
       const checked = state.ingVisibleCategories === null || state.ingVisibleCategories.includes(cat)
       h += '<label class="list-item" style="cursor:pointer;">'
@@ -2013,6 +2020,12 @@ function handleAction(action, el) {
       saveIngredient(ing)
       render()
     }
+  } else if (action === 'ing-select-none') {
+    state.ingVisibleCategories = []
+    render()
+  } else if (action === 'ing-select-all') {
+    state.ingVisibleCategories = null
+    render()
   } else if (action === 'toggle-ing-visible-category') {
     const cat = el.getAttribute('data-cat')
     if (state.ingVisibleCategories === null) {
