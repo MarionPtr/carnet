@@ -108,6 +108,18 @@ export async function saveRecipe(recipe) {
   }
 }
 
+// Marquer/démarquer une recette comme favorite
+export async function setRecipeFavorite(id, isFavorite) {
+  const { error } = await supabase
+    .from('recipes')
+    .update({ is_favorite: isFavorite })
+    .eq('id', id)
+  if (error) {
+    console.error('Erreur mise à jour favori recette:', error)
+    throw error
+  }
+}
+
 // Supprimer une recette
 export async function deleteRecipe(id) {
   const { error } = await supabase

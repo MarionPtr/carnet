@@ -7,6 +7,7 @@ import {
   saveIngredient,
   deleteIngredient,
   saveRecipe,
+  setRecipeFavorite,
   deleteRecipe,
   saveProfile,
   addLog,
@@ -87,6 +88,11 @@ const state = {
   ingViewMode: 'category', // 'category' ou 'alphabetical'
   ingVisibleCategories: null, // null = toutes visibles, sinon tableau de catégories cochées
   ingFavoritesOnly: false,
+  recipeSearch: '',
+  recipeViewMode: 'category', // 'category' ou 'alphabetical'
+  recipeVisibleTypes: null, // null = tous visibles, sinon tableau de types cochés
+  recipeFavoritesOnly: false,
+  collapsedRecipeTypes: {},
   logType: 'recipe',
   logMeal: 'petit-dej',
   logIngId: null,
@@ -502,37 +508,192 @@ function ingFilterForm() {
 }
 
 // ========== RECIPES ==========
+function recipeTypeOptions() {
+  const options = state.recipeTypes.slice()
+  if (state.recipes.some(r => !r.type)) options.push('Sans type')
+  return options
+}
+
+function recipeRowHtml(r, isLast) {
+  const m = recipeMacrosPerServing(r, state.ingredients)
+  let h = '<div class="list-item" style="cursor:pointer;padding:12px;align-items:center;border-bottom:' + (isLast ? 'none' : '1px solid var(--border)') + ';" data-action="view-recipe" data-id="' + r.id + '">'
+  h += '<div style="width:88px;height:88px;flex-shrink:0;border-radius:12px;overflow:hidden;margin-right:14px;background:var(--surface-raised);border:1px solid var(--border);">'
+  h += r.photo
+    ? '<img src="' + esc(r.photo) + '" style="width:100%;height:100%;object-fit:cover;"/>'
+    : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:34px;">🍽️</div>'
+  h += '</div>'
+  h += '<div style="flex:1;min-width:0;">'
+  if (r.type) {
+    h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;">' + esc(r.type) + '</div>'
+  }
+  h += '<div class="name" style="font-size:var(--text-h3);font-weight:600;">' + (r.is_favorite ? '⭐ ' : '') + esc(r.name) + '</div>'
+  h += '<div class="sub">' + r.servings + ' part. · ' + round(m.kcal) + ' kcal/part</div>'
+  h += '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;"><span class="pill protein">P ' + round(m.protein) + 'g</span><span class="pill carbs">G ' + round(m.carbs) + 'g</span><span class="pill fat">L ' + round(m.fat) + 'g</span></div>'
+  h += '</div>'
+  h += '<div style="color:var(--text-muted);font-size:28px;line-height:1;flex-shrink:0;padding-left:6px;">›</div>'
+  h += '</div>'
+  return h
+}
+
 function renderRecipes() {
-  let h = '<header class="top"><h1>Recettes</h1></header>'
+  const q = state.recipeSearch.toLowerCase()
+  const filtered = state.recipes.filter(r => r.name.toLowerCase().indexOf(q) > -1 && (!state.recipeFavoritesOnly || r.is_favorite))
+
+  const grouped = {}
+  filtered.forEach(r => {
+    const type = r.type || 'Sans type'
+    if (!grouped[type]) grouped[type] = []
+    grouped[type].push(r)
+  })
+  Object.keys(grouped).forEach(type => {
+    grouped[type].sort((a, b) => a.name.localeCompare(b.name))
+  })
+  const types = Object.keys(grouped).sort()
+
+  let h = '<header class="top" style="display:flex;align-items:center;justify-content:space-between;">'
+  h += '<h1>Recettes</h1>'
+  h += '<button data-action="open-add-recipe" style="width:40px;height:40px;flex-shrink:0;padding:0;line-height:1;border-radius:50%;background:var(--surface-raised);color:var(--text);border:1px solid var(--border-strong);font-size:22px;font-weight:500;display:flex;align-items:center;justify-content:center;cursor:pointer;">+</button>'
+  h += '</header>'
   h += '<section>'
-  h += '<button class="btn primary block" data-action="open-add-recipe" style="margin-bottom:14px;">+ Nouvelle recette</button>'
-  h += '<div class="card">'
+
+  const isFilterActive = state.recipeViewMode === 'alphabetical' || state.recipeVisibleTypes !== null || state.recipeFavoritesOnly
+  h += '<div style="display:flex;gap:8px;">'
+  h += '<div class="search-wrap" style="position:relative;flex:1;margin-bottom:0;">'
+  h += '<input placeholder="Rechercher…" id="recipe-search" value="' + esc(state.recipeSearch) + '" style="' + (state.recipeSearch ? 'padding-right:36px;' : '') + '"/>'
+  if (state.recipeSearch) {
+    h += '<button class="icon-btn" data-action="clear-recipe-search" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:var(--text-h3);">✕</button>'
+  }
+  h += '</div>'
+  h += '<button data-action="open-recipe-filter" style="position:relative;flex-shrink:0;width:44px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:var(--surface-raised);color:var(--text);border:1px solid var(--border-strong);cursor:pointer;">'
+  h += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="17" x2="14" y2="17"/></svg>'
+  if (isFilterActive) {
+    h += '<span style="position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--protein);"></span>'
+  }
+  h += '</button>'
+  h += '</div>'
+
+  const listWrapStyle = 'background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;'
 
   if (state.recipes.length === 0) {
     h += '<div class="empty">Aucune recette. Crée-en une à partir de tes ingrédients.</div>'
+  } else if (filtered.length === 0) {
+    h += '<div class="empty">Aucune recette trouvée.</div>'
+  } else if (state.recipeViewMode === 'alphabetical') {
+    const alphaList = filtered.slice().sort((a, b) => a.name.localeCompare(b.name))
+    h += '<div style="' + listWrapStyle + 'margin-top:16px;">'
+    alphaList.forEach((r, idx) => {
+      h += recipeRowHtml(r, idx === alphaList.length - 1)
+    })
+    h += '</div>'
   } else {
-    state.recipes
-      .slice()
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .forEach(r => {
-        const m = recipeMacrosPerServing(r, state.ingredients)
-        h += '<div class="list-item">'
-        h += '<div style="width:48px;height:48px;flex-shrink:0;border-radius:10px;overflow:hidden;margin-right:12px;background:var(--surface-raised);border:1px solid var(--border);">'
-        h += r.photo
-          ? '<img src="' + esc(r.photo) + '" style="width:100%;height:100%;object-fit:cover;"/>'
-          : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h3);">🍽️</div>'
+    const visibleTypes = state.recipeVisibleTypes === null
+      ? types
+      : types.filter(t => state.recipeVisibleTypes.includes(t))
+    visibleTypes.forEach(type => {
+      const isCollapsed = !state.recipeSearch && state.collapsedRecipeTypes[type] !== false
+      h += '<div data-action="toggle-recipe-type-collapse" data-type="' + esc(type) + '" style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px;cursor:pointer;">'
+      h += '<h4 style="font-size:var(--text-h3);font-weight:700;margin:0;">' + esc(type) + '</h4>'
+      h += '<span style="color:var(--text-muted);display:inline-flex;padding:4px;transform:rotate(' + (isCollapsed ? '-90deg' : '0deg') + ');transition:transform .15s ease;">'
+      h += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'
+      h += '</span>'
+      h += '</div>'
+      if (!isCollapsed) {
+        h += '<div style="' + listWrapStyle + '">'
+        grouped[type].forEach((r, idx) => {
+          h += recipeRowHtml(r, idx === grouped[type].length - 1)
+        })
         h += '</div>'
-        h += '<div style="flex:1;"><div class="name">' + esc(r.name) + (r.type ? ' <span class="pill" style="background:var(--surface-raised);color:var(--text-muted);">' + esc(r.type) + '</span>' : '') + '</div><div class="sub">' + r.servings + ' part. · ' + round(m.kcal) + ' kcal/part · <span class="pill protein">P ' + round(m.protein) + 'g</span> <span class="pill carbs">G ' + round(m.carbs) + 'g</span> <span class="pill fat">L ' + round(m.fat) + 'g</span></div></div>'
-        h += '<div class="actions">'
-        if (r.reference_url) {
-          h += '<a class="icon-btn" href="' + esc(r.reference_url) + '" target="_blank" rel="noopener" title="Recette de référence">🔗</a>'
-        }
-        h += '<button class="icon-btn" data-action="log-recipe-quick" data-id="' + r.id + '" title="Ajouter au journal">＋</button><button class="icon-btn" data-action="edit-recipe" data-id="' + r.id + '">✎</button><button class="icon-btn" data-action="del-recipe" data-id="' + r.id + '">✕</button></div>'
-        h += '</div>'
-      })
+      }
+    })
   }
 
-  h += '</div></section>'
+  h += '</section>'
+  return h
+}
+
+function recipeFilterForm() {
+  const mode = state.recipeViewMode
+  let h = '<h2>Affichage</h2>'
+  h += '<div class="segmented" style="margin-bottom:20px;">'
+  h += '<button type="button" class="' + (mode === 'category' ? 'active' : '') + '" data-action="set-recipe-view-mode" data-mode="category">Par type</button>'
+  h += '<button type="button" class="' + (mode === 'alphabetical' ? 'active' : '') + '" data-action="set-recipe-view-mode" data-mode="alphabetical">Liste alphabétique</button>'
+  h += '</div>'
+
+  h += '<label class="list-item" style="cursor:pointer;margin-bottom:20px;">'
+  h += '<span>⭐ Favoris uniquement</span>'
+  h += '<input type="checkbox" data-action="toggle-recipe-fav-filter" style="width:auto;" ' + (state.recipeFavoritesOnly ? 'checked' : '') + '/>'
+  h += '</label>'
+
+  if (mode === 'category') {
+    h += '<span class="lbl" style="display:block;margin-bottom:10px;">Types visibles</span>'
+    recipeTypeOptions().forEach(type => {
+      const checked = state.recipeVisibleTypes === null || state.recipeVisibleTypes.includes(type)
+      h += '<label class="list-item" style="cursor:pointer;">'
+      h += '<span>' + esc(type) + '</span>'
+      h += '<input type="checkbox" data-action="toggle-recipe-visible-type" data-type="' + esc(type) + '" style="width:auto;" ' + (checked ? 'checked' : '') + '/>'
+      h += '</label>'
+    })
+  }
+
+  return h
+}
+
+function recipeDetailModal(recipeId) {
+  const r = state.recipes.find(x => x.id === recipeId)
+  if (!r) return ''
+  const m = recipeMacrosPerServing(r, state.ingredients)
+
+  let h = ''
+
+  h += '<div style="width:100%;aspect-ratio:16/10;border-radius:14px;overflow:hidden;margin:0 0 16px;background:var(--surface-raised);border:1px solid var(--border);">'
+  if (r.photo) {
+    h += '<img src="' + esc(r.photo) + '" style="width:100%;height:100%;object-fit:cover;"/>'
+  } else {
+    h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:56px;">🍽️</div>'
+  }
+  h += '</div>'
+
+  if (r.type) {
+    h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">' + esc(r.type) + '</div>'
+  }
+  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
+  h += '<h2 style="margin:0;">' + esc(r.name) + '</h2>'
+  h += '<button data-action="toggle-recipe-favorite" data-id="' + r.id + '" style="background:none;border:none;cursor:pointer;font-size:22px;line-height:1;padding:2px;color:' + (r.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (r.is_favorite ? '★' : '☆') + '</button>'
+  h += '</div>'
+  h += '<div style="color:var(--text-muted);font-size:var(--text-small);margin-bottom:12px;font-weight:500;">' + r.servings + ' part.</div>'
+
+  if (r.reference_url) {
+    h += '<a href="' + esc(r.reference_url) + '" target="_blank" rel="noopener" style="display:inline-block;color:var(--protein);font-size:var(--text-small);font-weight:600;margin-bottom:16px;text-decoration:none;">🔗 Recette de référence</a>'
+  }
+
+  h += '<div class="card" style="background:var(--surface-raised);padding:14px;margin-bottom:16px;">'
+  h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Valeurs nutritionnelles par part</div>'
+  h += '<div style="border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:10px;">'
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;">'
+  h += '<div style="font-size:var(--text-small);">Énergie</div>'
+  h += '<div style="font-size:var(--text-h2);font-weight:700;">' + round(m.kcal) + ' <span style="font-size:var(--text-small);">kcal</span></div>'
+  h += '</div></div>'
+  h += '<div style="display:flex;flex-direction:column;gap:10px;">'
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Protéines</div><div style="font-weight:600;color:var(--protein);font-size:var(--text-h3);">' + round(m.protein) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Glucides</div><div style="font-weight:600;color:var(--carbs);font-size:var(--text-h3);">' + round(m.carbs) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Lipides</div><div style="font-weight:600;color:var(--fat);font-size:var(--text-h3);">' + round(m.fat) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
+  h += '</div></div>'
+
+  if ((r.items || []).length > 0) {
+    h += '<div class="card" style="background:var(--surface-raised);padding:14px;margin-bottom:16px;">'
+    h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Ingrédients</div>'
+    r.items.forEach((it, idx) => {
+      const ing = state.ingredients.find(i => i.id === it.ingredient_id)
+      h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);padding:6px 0;' + (idx < r.items.length - 1 ? 'border-bottom:1px solid var(--border);' : '') + '"><div>' + (ing ? esc(ing.name) : 'Ingrédient supprimé') + '</div><div style="font-weight:500;">' + round(it.grams) + ' ' + (ing && ing.unit ? esc(ing.unit) : 'g') + '</div></div>'
+    })
+    h += '</div>'
+  }
+
+  h += '<div class="row2">'
+  h += '<button class="btn primary" data-action="edit-recipe" data-id="' + r.id + '">Modifier</button>'
+  h += '<button class="btn danger-outline" data-action="del-recipe" data-id="' + r.id + '">Supprimer</button>'
+  h += '</div>'
+
   return h
 }
 
@@ -687,6 +848,8 @@ function renderModal() {
   else if (m.type === 'date-picker') body = datePickerForm()
   else if (m.type === 'settings') body = settingsForm()
   else if (m.type === 'ing-filter') body = ingFilterForm()
+  else if (m.type === 'recipe-detail') body = recipeDetailModal(m.recipeId)
+  else if (m.type === 'recipe-filter') body = recipeFilterForm()
   else if (m.type === 'recipe-ing-picker') body = recipeIngPickerModal()
   else if (m.type === 'edit-recipe-type') body = editRecipeTypeForm(m.typeIdx)
 
@@ -1226,6 +1389,22 @@ function bindEvents() {
     })
   }
 
+  // Recipe search
+  const recipeSearchInput = document.getElementById('recipe-search')
+  if (recipeSearchInput) {
+    recipeSearchInput.addEventListener('input', () => {
+      state.recipeSearch = recipeSearchInput.value
+      render()
+      setTimeout(() => {
+        const el = document.getElementById('recipe-search')
+        if (el) {
+          el.focus()
+          el.selectionStart = el.selectionEnd = el.value.length
+        }
+      }, 0)
+    })
+  }
+
   // Actions
   app.querySelectorAll('[data-action]').forEach(el => {
     el.addEventListener('click', () => {
@@ -1552,6 +1731,47 @@ function handleAction(action, el) {
       state.ingVisibleCategories = null
     }
     render()
+  } else if (action === 'clear-recipe-search') {
+    state.recipeSearch = ''
+    render()
+  } else if (action === 'toggle-recipe-type-collapse') {
+    const type = el.getAttribute('data-type')
+    const currentlyCollapsed = state.collapsedRecipeTypes[type] !== false
+    state.collapsedRecipeTypes[type] = !currentlyCollapsed
+    render()
+  } else if (action === 'open-recipe-filter') {
+    state.modal = { type: 'recipe-filter' }
+    render()
+  } else if (action === 'set-recipe-view-mode') {
+    state.recipeViewMode = el.getAttribute('data-mode')
+    render()
+  } else if (action === 'toggle-recipe-fav-filter') {
+    state.recipeFavoritesOnly = el.checked
+    render()
+  } else if (action === 'toggle-recipe-visible-type') {
+    const type = el.getAttribute('data-type')
+    const allTypes = recipeTypeOptions()
+    if (state.recipeVisibleTypes === null) {
+      state.recipeVisibleTypes = allTypes.filter(t => t !== type)
+    } else if (el.checked) {
+      if (!state.recipeVisibleTypes.includes(type)) state.recipeVisibleTypes.push(type)
+    } else {
+      state.recipeVisibleTypes = state.recipeVisibleTypes.filter(t => t !== type)
+    }
+    if (state.recipeVisibleTypes.length === allTypes.length) {
+      state.recipeVisibleTypes = null
+    }
+    render()
+  } else if (action === 'view-recipe') {
+    state.modal = { type: 'recipe-detail', recipeId: el.getAttribute('data-id') }
+    render()
+  } else if (action === 'toggle-recipe-favorite') {
+    const recipe = state.recipes.find(r => r.id === el.getAttribute('data-id'))
+    if (recipe) {
+      recipe.is_favorite = !recipe.is_favorite
+      setRecipeFavorite(recipe.id, recipe.is_favorite)
+      render()
+    }
   } else if (action === 'set-ing-unit') {
     if (!state._draftIngredient) state._draftIngredient = {}
     state._draftIngredient.unit = el.getAttribute('data-unit')
@@ -1715,7 +1935,7 @@ function handleAction(action, el) {
         photo: photo
       }
       if (editId) {
-        state.ingredients = state.ingredients.map(i => (i.id === editId ? obj : i))
+        state.ingredients = state.ingredients.map(i => (i.id === editId ? { ...obj, is_favorite: i.is_favorite } : i))
       } else {
         state.ingredients.push(obj)
       }
@@ -1737,6 +1957,7 @@ function handleAction(action, el) {
     const rid = el.getAttribute('data-id')
     state.recipes = state.recipes.filter(r => r.id !== rid)
     deleteRecipe(rid)
+    state.modal = null
     render()
   } else if (action === 'add-recipe-item') {
     if (!state._draftRecipe) return
@@ -1798,7 +2019,7 @@ function handleAction(action, el) {
       items: draft.items
     }
     if (editId2) {
-      state.recipes = state.recipes.map(r => (r.id === editId2 ? obj2 : r))
+      state.recipes = state.recipes.map(r => (r.id === editId2 ? { ...obj2, is_favorite: r.is_favorite } : r))
     } else {
       state.recipes.push(obj2)
     }
@@ -1807,11 +2028,6 @@ function handleAction(action, el) {
     state.modal = null
     render()
     showToast('Recette enregistrée')
-  } else if (action === 'log-recipe-quick') {
-    const rid2 = el.getAttribute('data-id')
-    state.logMeal = defaultMealForNow()
-    logRecipe(rid2, 1)
-    showToast('Ajouté au journal')
   } else if (action === 'set-log-portion') {
     const idx = parseInt(el.getAttribute('data-idx'))
     state.logPortionIdx = idx === -1 ? null : idx
