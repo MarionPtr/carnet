@@ -824,7 +824,7 @@ function renderProfile() {
   h += '<div class="card">'
   h += '<button class="list-item" style="width:100%;background:none;border:none;text-align:left;cursor:pointer;color:var(--text);" data-action="open-objectives">'
   h += '<div><div style="font-size:var(--text-h3);font-weight:600;">Objectifs</div>'
-  h += '<div style="font-size:var(--text-body);color:var(--text-muted);margin-top:4px;"><span style="color:var(--text);font-weight:600;">' + targets.kcal + '</span> kcal / jour</div></div>'
+  h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + targets.kcal + ' kcal / jour</div></div>'
   h += '<span style="color:var(--text-muted);font-size:var(--text-body);">›</span>'
   h += '</button>'
   h += '</div>'
