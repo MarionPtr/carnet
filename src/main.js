@@ -532,9 +532,6 @@ function recipeRowHtml(r, isLast) {
     : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:34px;">🍽️</div>'
   h += '</div>'
   h += '<div style="flex:1;min-width:0;">'
-  if (r.type) {
-    h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;">' + esc(r.type) + '</div>'
-  }
   h += '<div class="name" style="font-size:var(--text-h3);font-weight:600;">' + (r.is_favorite ? '⭐ ' : '') + esc(r.name) + '</div>'
   h += '<div class="sub">' + r.servings + ' part. · ' + round(m.kcal) + ' kcal/part</div>'
   h += '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;"><span class="pill protein">P ' + round(m.protein) + 'g</span><span class="pill carbs">G ' + round(m.carbs) + 'g</span><span class="pill fat">L ' + round(m.fat) + 'g</span></div>'
