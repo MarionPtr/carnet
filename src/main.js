@@ -821,11 +821,12 @@ function renderProfile() {
   h += '</div>'
 
   // === SECTION OBJECTIFS ===
-  h += '<div class="card">'
-  h += '<button class="list-item" style="width:100%;background:none;border:none;text-align:left;cursor:pointer;color:var(--text);" data-action="open-objectives">'
-  h += '<div><div style="font-size:var(--text-h3);font-weight:600;">Objectifs</div>'
-  h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + targets.kcal + ' kcal / jour</div></div>'
-  h += '<span style="color:var(--text-muted);font-size:var(--text-body);">›</span>'
+  h += '<div class="card" style="padding-top:2px;padding-bottom:2px;">'
+  h += '<button class="list-item" style="width:100%;background:none;border:none;text-align:left;cursor:pointer;color:var(--text);font-size:var(--text-body);" data-action="open-objectives">'
+  h += '<div style="display:flex;align-items:center;"><span style="margin-right:10px;">🎯</span>'
+  h += '<div><div style="font-size:var(--text-body);font-weight:600;">Objectifs</div>'
+  h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + targets.kcal + ' kcal / jour</div></div></div>'
+  h += '<span style="color:var(--text-muted);">›</span>'
   h += '</button>'
   h += '</div>'
 
