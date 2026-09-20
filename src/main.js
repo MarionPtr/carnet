@@ -133,6 +133,8 @@ const state = {
   _ingDetailPortionIdx: null,
   _draftIngredient: null,
   _draftRecipe: null,
+  profilePage: null, // sous-page du profil : 'settings' | 'objectives' (null = profil)
+  _profileScrollY: 0,
   viewRecipeId: null, // recette affichée en pleine page (null = liste)
   _recipesScrollY: 0,
   _recipeDetailServings: null, // nombre de parts affiché dans le détail (null = celui de la recette)
@@ -217,7 +219,7 @@ function render() {
   else if (state.tab === 'today') html = renderToday()
   else if (state.tab === 'ingredients') html = renderIngredients()
   else if (state.tab === 'recipes') html = renderRecipes()
-  else if (state.tab === 'profile') html = renderProfile()
+  else if (state.tab === 'profile') html = state.profilePage ? renderProfileSubPage() : renderProfile()
 
   if (state.tab !== 'profile' && !state.viewRecipeId) html += renderTabs()
   if (state.modal) html += renderModal()
@@ -829,6 +831,17 @@ function recipeDetailBody(recipeId) {
 }
 
 // ========== PROFILE ==========
+function renderProfileSubPage() {
+  const isSettings = state.profilePage === 'settings'
+  let h = '<header class="top" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+  h += '<button data-action="close-profile-page" title="Retour au profil" style="width:40px;height:40px;flex-shrink:0;padding:0;border-radius:50%;background:var(--surface-raised);color:var(--text);border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;cursor:pointer;"><span class="header-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></span></button>'
+  h += '<h1 style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;text-align:center;flex:1;">' + (isSettings ? 'Paramètres' : 'Objectifs') + '</h1>'
+  h += '<div style="width:40px;flex-shrink:0;"></div>'
+  h += '</header>'
+  h += '<section style="padding-bottom:32px;">' + (isSettings ? settingsPageBody() : objectivesPageBody()) + '</section>'
+  return h
+}
+
 function renderProfile() {
   const p = state.profile
   const targets = computeTargets(p)
@@ -880,8 +893,8 @@ function renderProfile() {
   return h
 }
 
-function settingsForm() {
-  let h = '<h2>Paramètres</h2>'
+function settingsPageBody() {
+  let h = ''
 
   // === CATÉGORIES ===
   h += '<h3 style="margin:0 0 12px;">Catégories d\'ingrédients</h3>'
@@ -973,9 +986,7 @@ function renderModal() {
   else if (m.type === 'edit-profile') body = editProfileForm()
   else if (m.type === 'edit-category') body = editCategoryForm(m.categoryIdx)
   else if (m.type === 'date-picker') body = datePickerForm()
-  else if (m.type === 'settings') body = settingsForm()
   else if (m.type === 'ing-filter') body = ingFilterForm()
-  else if (m.type === 'objectives') body = objectivesModal()
   else if (m.type === 'recipe-filter') body = recipeFilterForm()
   else if (m.type === 'recipe-ing-picker') body = recipeIngPickerModal()
   else if (m.type === 'edit-recipe-type') body = editRecipeTypeForm(m.typeIdx)
@@ -1301,10 +1312,10 @@ function refreshObjectiveSummary() {
   if (el) el.innerHTML = objectiveSummaryHtml()
 }
 
-function objectivesModal() {
+function objectivesPageBody() {
   const p = state.profile
 
-  let h = '<h2>Objectifs</h2>'
+  let h = ''
   h += '<div class="card" id="obj-summary" style="background:var(--surface-raised);margin-bottom:20px;">' + objectiveSummaryHtml() + '</div>'
 
   h += '<span class="lbl" style="display:block;margin-bottom:6px;">Objectif</span><div class="segmented" id="p-goal" style="margin-bottom:20px;">'
@@ -1346,9 +1357,6 @@ function objectivesModal() {
     h += '<div class="sub" style="margin-top:4px;">Total : <span id="c-kcal-computed">' + round(p.custom_kcal) + '</span> kcal</div>'
   }
   h += '</div>'
-
-
-  h += '<button class="btn primary block" data-action="close-modal" style="margin-top:12px;">Terminé</button>'
 
   return h
 }
@@ -2008,13 +2016,23 @@ function handleAction(action, el) {
     render()
   } else if (action === 'close-profile') {
     state.tab = 'today'
+    state.profilePage = null
     state.modal = null
     render()
-  } else if (action === 'open-objectives') {
-    state.modal = { type: 'objectives' }
+  } else if (action === 'open-objectives' || action === 'open-settings') {
+    state._profileScrollY = window.scrollY
+    state.profilePage = action === 'open-settings' ? 'settings' : 'objectives'
+    state.modal = null
     render()
+    window.scrollTo(0, 0)
+  } else if (action === 'close-profile-page') {
+    state.profilePage = null
+    state.modal = null
+    render()
+    window.scrollTo(0, state._profileScrollY)
   } else if (action === 'open-profile') {
     state.tab = 'profile'
+    state.profilePage = null
     state.modal = null
     render()
   } else if (action === 'prev-day') {
@@ -2049,10 +2067,12 @@ function handleAction(action, el) {
     localStorage.removeItem(PERSON_STORAGE_KEY)
     state.authenticated = false
     state.currentPerson = null
+    state.profilePage = null
     render()
   } else if (action === 'switch-person') {
     localStorage.removeItem(PERSON_STORAGE_KEY)
     state.currentPerson = null
+    state.profilePage = null
     render()
   } else if (action === 'set-theme') {
     const theme = el.getAttribute('data-theme')
@@ -2062,9 +2082,6 @@ function handleAction(action, el) {
     render()
   } else if (action === 'open-edit-profile') {
     state.modal = { type: 'edit-profile' }
-    render()
-  } else if (action === 'open-settings') {
-    state.modal = { type: 'settings' }
     render()
   } else if (action === 'view-ing') {
     state._ingDetailPortionIdx = null
