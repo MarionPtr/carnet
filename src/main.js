@@ -319,9 +319,11 @@ function renderToday() {
   const isToday = state.currentDate === todayStr()
   let h = '<header class="top">'
   h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+  h += '<div style="width:40px;flex-shrink:0;"></div>'
   h += '<button class="icon-btn" data-action="prev-day" style="font-size:var(--text-h2);padding:4px 10px;flex-shrink:0;">‹</button>'
   h += '<h1 data-action="open-date-picker" style="cursor:pointer;text-align:center;flex:1;">' + (isToday ? 'Aujourd\'hui' : formatDateFR(parseLocalDate(state.currentDate))) + '</h1>'
   h += '<button class="icon-btn" data-action="next-day" style="font-size:var(--text-h2);padding:4px 10px;flex-shrink:0;">›</button>'
+  h += '<button data-action="open-profile" title="Profil" style="width:40px;height:40px;flex-shrink:0;padding:0;border-radius:50%;background:var(--surface-raised);color:var(--text);border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;cursor:pointer;"><span class="header-icon">' + tabIcon('profile') + '</span></button>'
   h += '</div>'
   h += '</header>'
   h += '<section>'
@@ -909,8 +911,7 @@ function renderTabs() {
   const tabs = [
     ['today', 'Journal'],
     ['ingredients', 'Ingrédients'],
-    ['recipes', 'Recettes'],
-    ['profile', 'Profil']
+    ['recipes', 'Recettes']
   ]
   let h = '<nav class="tabs">'
   tabs.forEach(t => {
@@ -1901,6 +1902,10 @@ function handleAction(action, el) {
   } else if (action === 'set-custom-mode') {
     state.profile.custom_mode = el.getAttribute('data-mode')
     saveProfile(state.profile)
+    render()
+  } else if (action === 'open-profile') {
+    state.tab = 'profile'
+    state.modal = null
     render()
   } else if (action === 'prev-day') {
     changeDate(addDays(state.currentDate, -1))
