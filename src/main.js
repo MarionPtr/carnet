@@ -1066,19 +1066,26 @@ function recipeForm(editId) {
 
   let h = '<h2>' + (editId ? 'Modifier' : 'Nouvelle') + ' recette</h2>'
   h += '<label class="field"><span class="lbl">Nom</span><input id="rf-name" value="' + esc(draft.name) + '"/></label>'
-  h += '<label class="field"><span class="lbl">Nombre de portions</span><input type="number" id="rf-servings" value="' + draft.servings + '" min="1"/></label>'
 
   h += '<label class="field"><span class="lbl">Type</span><select id="rf-type">'
   h += '<option value="">Sélectionner un type</option>'
   state.recipeTypes.forEach(t => {
     h += '<option value="' + t + '" ' + (draft.type === t ? 'selected' : '') + '>' + t + '</option>'
   })
-  h += '<option value="__new__">+ Ajouter un type</option>'
+  h += '<option value="__new__" ' + (draft.type === '__new__' ? 'selected' : '') + '>+ Ajouter un type</option>'
   h += '</select></label>'
-  h += '<input id="rf-new-type" type="text" placeholder="Nouveau type" style="display:none;margin-bottom:10px;"/>'
+  h += '<input id="rf-new-type" type="text" placeholder="Nouveau type" value="' + esc(draft.newType || '') + '" style="display:' + (draft.type === '__new__' ? 'block' : 'none') + ';margin-bottom:10px;"/>'
 
   h += '<label class="field"><span class="lbl">Lien de la recette de référence</span><input id="rf-reference-url" value="' + esc(draft.reference_url) + '" placeholder="https://…"/></label>'
   h += '<label class="field"><span class="lbl">Lien de la photo</span><input id="rf-photo-url" value="' + esc(draft.photo) + '" placeholder="https://…"/></label>'
+
+  const stepBtn = 'width:36px;height:36px;padding:0;line-height:1;border-radius:50%;background:var(--surface-raised);color:var(--text);border:1px solid var(--border-strong);font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;'
+  h += '<span class="lbl" style="display:block;margin-bottom:6px;">Nombre de portions</span>'
+  h += '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">'
+  h += '<button type="button" data-action="rf-servings-step" data-delta="-1" style="' + stepBtn + '">−</button>'
+  h += '<span style="font-size:var(--text-h3);font-weight:600;min-width:28px;text-align:center;">' + Math.max(1, parseInt(draft.servings) || 1) + '</span>'
+  h += '<button type="button" data-action="rf-servings-step" data-delta="1" style="' + stepBtn + '">+</button>'
+  h += '</div>'
 
   h += '<span class="lbl" style="display:block;margin-bottom:6px;">Ingrédients</span>'
 
@@ -1664,13 +1671,6 @@ function bindEvents() {
       state._draftRecipe.name = rfName.value
     })
   }
-  const rfServings = document.getElementById('rf-servings')
-  if (rfServings) {
-    rfServings.addEventListener('input', () => {
-      if (!state._draftRecipe) return
-      state._draftRecipe.servings = rfServings.value
-    })
-  }
   const rfReferenceUrl = document.getElementById('rf-reference-url')
   if (rfReferenceUrl) {
     rfReferenceUrl.addEventListener('input', () => {
@@ -1698,14 +1698,19 @@ function bindEvents() {
   const rfNewTypeInput = document.getElementById('rf-new-type')
   if (rfTypeSelect) {
     rfTypeSelect.addEventListener('change', () => {
+      if (!state._draftRecipe) state._draftRecipe = {}
+      state._draftRecipe.type = rfTypeSelect.value
       if (rfTypeSelect.value === '__new__') {
         rfNewTypeInput.style.display = 'block'
         rfNewTypeInput.focus()
       } else {
         rfNewTypeInput.style.display = 'none'
-        if (!state._draftRecipe) state._draftRecipe = {}
-        state._draftRecipe.type = rfTypeSelect.value
       }
+    })
+  }
+  if (rfNewTypeInput) {
+    rfNewTypeInput.addEventListener('input', () => {
+      if (state._draftRecipe) state._draftRecipe.newType = rfNewTypeInput.value
     })
   }
 
@@ -2076,6 +2081,11 @@ function handleAction(action, el) {
     deleteRecipe(rid)
     state.modal = null
     render()
+  } else if (action === 'rf-servings-step') {
+    if (!state._draftRecipe) return
+    const current = Math.max(1, parseInt(state._draftRecipe.servings) || 1)
+    state._draftRecipe.servings = Math.max(1, current + parseInt(el.getAttribute('data-delta')))
+    render()
   } else if (action === 'add-recipe-item') {
     if (!state._draftRecipe) return
     state._draftRecipe.items.push({ ingredient_id: null, grams: 100 })
@@ -2113,7 +2123,7 @@ function handleAction(action, el) {
       showToast('Choisis un ingrédient pour chaque ligne')
       return
     }
-    const servings = parseInt(document.getElementById('rf-servings').value) || 1
+    const servings = Math.max(1, parseInt(draft.servings) || 1)
     let type = document.getElementById('rf-type').value
     if (type === '__new__') {
       type = document.getElementById('rf-new-type').value.trim()
