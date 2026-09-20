@@ -41,6 +41,37 @@ const APP_PASSWORD = 'SkodaRouge12/'
 const AUTH_STORAGE_KEY = 'carnet_authenticated'
 const THEME_STORAGE_KEY = 'carnet_theme'
 const PERSON_STORAGE_KEY = 'carnet_person'
+const DISPLAY_PREFS_KEY = 'carnet_display_prefs'
+const DISPLAY_PREF_FIELDS = [
+  'ingViewMode',
+  'ingVisibleCategories',
+  'ingFavoritesOnly',
+  'collapsedCategories',
+  'recipeViewMode',
+  'recipeVisibleTypes',
+  'recipeFavoritesOnly',
+  'collapsedRecipeTypes'
+]
+
+function loadDisplayPrefs() {
+  try {
+    return JSON.parse(localStorage.getItem(DISPLAY_PREFS_KEY)) || {}
+  } catch (e) {
+    return {}
+  }
+}
+
+function saveDisplayPrefs() {
+  const prefs = {}
+  DISPLAY_PREF_FIELDS.forEach(f => {
+    prefs[f] = state[f]
+  })
+  try {
+    localStorage.setItem(DISPLAY_PREFS_KEY, JSON.stringify(prefs))
+  } catch (e) {}
+}
+
+const savedPrefs = loadDisplayPrefs()
 
 const MEALS = [
   { key: 'petit-dej', label: 'Petit-déjeuner' },
@@ -84,15 +115,15 @@ const state = {
   modal: null,
   toastMsg: null,
   ingSearch: '',
-  collapsedCategories: {},
-  ingViewMode: 'category', // 'category' ou 'alphabetical'
-  ingVisibleCategories: null, // null = toutes visibles, sinon tableau de catégories cochées
-  ingFavoritesOnly: false,
+  collapsedCategories: savedPrefs.collapsedCategories || {},
+  ingViewMode: savedPrefs.ingViewMode || 'category', // 'category' ou 'alphabetical'
+  ingVisibleCategories: savedPrefs.ingVisibleCategories || null, // null = toutes visibles, sinon tableau de catégories cochées
+  ingFavoritesOnly: !!savedPrefs.ingFavoritesOnly,
   recipeSearch: '',
-  recipeViewMode: 'category', // 'category' ou 'alphabetical'
-  recipeVisibleTypes: null, // null = tous visibles, sinon tableau de types cochés
-  recipeFavoritesOnly: false,
-  collapsedRecipeTypes: {},
+  recipeViewMode: savedPrefs.recipeViewMode || 'category', // 'category' ou 'alphabetical'
+  recipeVisibleTypes: savedPrefs.recipeVisibleTypes || null, // null = tous visibles, sinon tableau de types cochés
+  recipeFavoritesOnly: !!savedPrefs.recipeFavoritesOnly,
+  collapsedRecipeTypes: savedPrefs.collapsedRecipeTypes || {},
   logType: 'recipe',
   logMeal: 'petit-dej',
   logIngId: null,
@@ -1449,6 +1480,7 @@ function bindEvents() {
     el.addEventListener('click', () => {
       const action = el.getAttribute('data-action')
       handleAction(action, el)
+      saveDisplayPrefs()
     })
   })
 
