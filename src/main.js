@@ -124,6 +124,7 @@ const state = {
   recipeViewMode: savedPrefs.recipeViewMode || 'category', // 'category' ou 'alphabetical'
   recipeLayout: savedPrefs.recipeLayout || 'list', // 'list' ou 'cards'
   recipeViewMenuOpen: false,
+  ingViewMenuOpen: false,
   recipeVisibleTypes: savedPrefs.recipeVisibleTypes || null, // null = tous visibles, sinon tableau de types cochés
   recipeFavoritesOnly: !!savedPrefs.recipeFavoritesOnly,
   collapsedRecipeTypes: savedPrefs.collapsedRecipeTypes || {},
@@ -449,8 +450,9 @@ function renderIngredients() {
   h += '<button data-action="open-add-ing" style="width:40px;height:40px;flex-shrink:0;padding:0;line-height:1;border-radius:50%;background:var(--surface-raised);color:var(--text);border:1px solid var(--border-strong);font-size:22px;font-weight:500;display:flex;align-items:center;justify-content:center;cursor:pointer;">+</button>'
   h += '</header>'
   h += '<section>'
-  const isFilterActive = state.ingViewMode === 'alphabetical' || (state.ingVisibleCategories !== null) || state.ingFavoritesOnly
-  h += '<div style="display:flex;gap:8px;">'
+  const isFilterActive = state.ingVisibleCategories !== null || state.ingFavoritesOnly
+  const isViewCustom = state.ingViewMode === 'alphabetical'
+  h += '<div style="display:flex;gap:8px;position:relative;">'
   h += '<div class="search-wrap" style="position:relative;flex:1;margin-bottom:0;">'
   h += '<input placeholder="Rechercher…" id="ing-search" value="' + esc(state.ingSearch) + '" style="' + (state.ingSearch ? 'padding-right:36px;' : '') + '"/>'
   if (state.ingSearch) {
@@ -463,6 +465,13 @@ function renderIngredients() {
     h += '<span style="position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--protein);"></span>'
   }
   h += '</button>'
+  h += '<button data-action="toggle-ing-view-menu" title="Affichage" style="position:relative;flex-shrink:0;width:44px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:var(--surface-raised);color:var(--text);border:1px solid var(--border-strong);cursor:pointer;">'
+  h += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg>'
+  if (isViewCustom) {
+    h += '<span style="position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--protein);"></span>'
+  }
+  h += '</button>'
+  if (state.ingViewMenuOpen) h += ingViewMenuHtml()
   h += '</div>'
 
   const useAlphabetical = state.ingViewMode === 'alphabetical'
@@ -534,29 +543,14 @@ function ingGroupKeys() {
 }
 
 function ingFilterForm() {
-  const mode = state.ingViewMode
-  let h = '<h2>Affichage</h2>'
-  h += '<div class="segmented" style="margin-bottom:20px;">'
-  h += '<button type="button" class="' + (mode === 'category' ? 'active' : '') + '" data-action="set-ing-view-mode" data-mode="category">Par catégorie</button>'
-  h += '<button type="button" class="' + (mode === 'alphabetical' ? 'active' : '') + '" data-action="set-ing-view-mode" data-mode="alphabetical">Liste alphabétique</button>'
-  h += '</div>'
-
-  if (mode === 'category') {
-    const keys = ingGroupKeys()
-    const allExpanded = keys.length > 0 && keys.every(c => state.collapsedCategories[c] === false)
-    h += '<span class="lbl" style="display:block;margin-bottom:10px;">Sections</span>'
-    h += '<div class="segmented" style="margin-bottom:20px;">'
-    h += '<button type="button" class="' + (!allExpanded ? 'active' : '') + '" data-action="set-ing-collapse-all" data-collapsed="true">Repliées</button>'
-    h += '<button type="button" class="' + (allExpanded ? 'active' : '') + '" data-action="set-ing-collapse-all" data-collapsed="false">Dépliées</button>'
-    h += '</div>'
-  }
+  let h = '<h2>Filtres</h2>'
 
   h += '<label class="list-item" style="cursor:pointer;margin-bottom:20px;">'
   h += '<span>⭐ Favoris uniquement</span>'
   h += '<input type="checkbox" data-action="toggle-fav-filter" style="width:auto;" ' + (state.ingFavoritesOnly ? 'checked' : '') + '/>'
   h += '</label>'
 
-  if (mode === 'category') {
+  if (state.ingViewMode === 'category') {
     h += '<span class="lbl" style="display:block;margin-bottom:10px;">Catégories visibles</span>'
     state.categories.forEach(cat => {
       const checked = state.ingVisibleCategories === null || state.ingVisibleCategories.includes(cat)
@@ -636,38 +630,69 @@ function recipeGroupHtml(list) {
   return h + '</div>'
 }
 
-function recipeViewMenuHtml() {
+// Menu déroulant façon iOS : groupes d'options avec coches, séparés par des filets
+function viewMenuHtml(groups, closeAction) {
   const checkSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12 10 18 20 6"/></svg>'
   const icons = {
     grid: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg>',
     list: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01M8 6h13M8 12h13M8 18h13"/></svg>'
   }
-  const item = (label, checked, attrs, icon, hasIcons) => {
-    let row = '<button type="button" ' + attrs + ' style="display:flex;align-items:center;width:100%;background:none;border:none;color:var(--text);text-align:left;cursor:pointer;padding:0 18px 0 12px;height:48px;font-size:var(--text-h3);">'
-    row += '<span style="width:28px;flex-shrink:0;display:flex;align-items:center;">' + (checked ? checkSvg : '') + '</span>'
-    if (hasIcons) row += '<span style="width:22px;height:22px;flex-shrink:0;margin-right:12px;display:flex;color:var(--text);">' + (icon ? icons[icon] : '') + '</span>'
-    row += '<span>' + label + '</span></button>'
-    return row
-  }
-  const sep = '<div style="height:1px;background:var(--border-strong);margin:4px 14px;"></div>'
+  let h = '<div style="position:fixed;inset:0;z-index:25;" data-action="' + closeAction + '"></div>'
+  h += '<div style="position:absolute;top:52px;right:0;z-index:30;min-width:260px;padding:6px 0;background:var(--surface-raised);border:1px solid var(--border-strong);border-radius:16px;box-shadow:0 12px 32px rgba(0,0,0,0.45);">'
+  groups.forEach((group, gi) => {
+    if (gi > 0) h += '<div style="height:1px;background:var(--border-strong);margin:4px 14px;"></div>'
+    const hasIcons = group.some(it => it.icon)
+    group.forEach(it => {
+      h += '<button type="button" ' + it.attrs + ' style="display:flex;align-items:center;width:100%;background:none;border:none;color:var(--text);text-align:left;cursor:pointer;padding:0 18px 0 12px;height:48px;font-size:var(--text-h3);">'
+      h += '<span style="width:28px;flex-shrink:0;display:flex;align-items:center;">' + (it.checked ? checkSvg : '') + '</span>'
+      if (hasIcons) h += '<span style="width:22px;height:22px;flex-shrink:0;margin-right:12px;display:flex;">' + (it.icon ? icons[it.icon] : '') + '</span>'
+      h += '<span>' + it.label + '</span></button>'
+    })
+  })
+  h += '</div>'
+  return h
+}
+
+function recipeViewMenuHtml() {
   const mode = state.recipeViewMode
   const keys = recipeGroupKeys()
   const allExpanded = keys.length > 0 && keys.every(t => state.collapsedRecipeTypes[t] === false)
-
-  let h = '<div style="position:fixed;inset:0;z-index:25;" data-action="close-recipe-view-menu"></div>'
-  h += '<div style="position:absolute;top:52px;right:0;z-index:30;min-width:260px;padding:6px 0;background:var(--surface-raised);border:1px solid var(--border-strong);border-radius:16px;box-shadow:0 12px 32px rgba(0,0,0,0.45);">'
-  h += item('Par type', mode === 'category', 'data-action="set-recipe-view-mode" data-mode="category"')
-  h += item('Liste alphabétique', mode === 'alphabetical', 'data-action="set-recipe-view-mode" data-mode="alphabetical"')
-  h += sep
-  h += item('Cartes', state.recipeLayout === 'cards', 'data-action="set-recipe-layout" data-layout="cards"', 'grid', true)
-  h += item('Liste', state.recipeLayout !== 'cards', 'data-action="set-recipe-layout" data-layout="list"', 'list', true)
+  const groups = [
+    [
+      { label: 'Par type', checked: mode === 'category', attrs: 'data-action="set-recipe-view-mode" data-mode="category"' },
+      { label: 'Liste alphabétique', checked: mode === 'alphabetical', attrs: 'data-action="set-recipe-view-mode" data-mode="alphabetical"' }
+    ],
+    [
+      { label: 'Cartes', checked: state.recipeLayout === 'cards', attrs: 'data-action="set-recipe-layout" data-layout="cards"', icon: 'grid' },
+      { label: 'Liste', checked: state.recipeLayout !== 'cards', attrs: 'data-action="set-recipe-layout" data-layout="list"', icon: 'list' }
+    ]
+  ]
   if (mode === 'category') {
-    h += sep
-    h += item('Sections repliées', !allExpanded, 'data-action="set-recipe-collapse-all" data-collapsed="true"')
-    h += item('Sections dépliées', allExpanded, 'data-action="set-recipe-collapse-all" data-collapsed="false"')
+    groups.push([
+      { label: 'Sections repliées', checked: !allExpanded, attrs: 'data-action="set-recipe-collapse-all" data-collapsed="true"' },
+      { label: 'Sections dépliées', checked: allExpanded, attrs: 'data-action="set-recipe-collapse-all" data-collapsed="false"' }
+    ])
   }
-  h += '</div>'
-  return h
+  return viewMenuHtml(groups, 'close-recipe-view-menu')
+}
+
+function ingViewMenuHtml() {
+  const mode = state.ingViewMode
+  const keys = ingGroupKeys()
+  const allExpanded = keys.length > 0 && keys.every(c => state.collapsedCategories[c] === false)
+  const groups = [
+    [
+      { label: 'Par catégorie', checked: mode === 'category', attrs: 'data-action="set-ing-view-mode" data-mode="category"' },
+      { label: 'Liste alphabétique', checked: mode === 'alphabetical', attrs: 'data-action="set-ing-view-mode" data-mode="alphabetical"' }
+    ]
+  ]
+  if (mode === 'category') {
+    groups.push([
+      { label: 'Sections repliées', checked: !allExpanded, attrs: 'data-action="set-ing-collapse-all" data-collapsed="true"' },
+      { label: 'Sections dépliées', checked: allExpanded, attrs: 'data-action="set-ing-collapse-all" data-collapsed="false"' }
+    ])
+  }
+  return viewMenuHtml(groups, 'close-ing-view-menu')
 }
 
 function renderRecipes() {
@@ -1586,6 +1611,7 @@ function bindEvents() {
     btn.addEventListener('click', () => {
       state.tab = btn.getAttribute('data-tab')
       state.recipeViewMenuOpen = false
+      state.ingViewMenuOpen = false
       state.modal = null
       render()
     })
@@ -1930,17 +1956,26 @@ function handleAction(action, el) {
     const currentlyCollapsed = state.collapsedCategories[cat] !== false
     state.collapsedCategories[cat] = !currentlyCollapsed
     render()
+  } else if (action === 'toggle-ing-view-menu') {
+    state.ingViewMenuOpen = !state.ingViewMenuOpen
+    render()
+  } else if (action === 'close-ing-view-menu') {
+    state.ingViewMenuOpen = false
+    render()
   } else if (action === 'set-ing-collapse-all') {
     const collapsed = el.getAttribute('data-collapsed') === 'true'
     ingGroupKeys().forEach(c => {
       state.collapsedCategories[c] = collapsed
     })
+    state.ingViewMenuOpen = false
     render()
   } else if (action === 'open-ing-filter') {
+    state.ingViewMenuOpen = false
     state.modal = { type: 'ing-filter' }
     render()
   } else if (action === 'set-ing-view-mode') {
     state.ingViewMode = el.getAttribute('data-mode')
+    state.ingViewMenuOpen = false
     render()
   } else if (action === 'toggle-fav-filter') {
     state.ingFavoritesOnly = el.checked
@@ -2121,6 +2156,7 @@ function handleAction(action, el) {
     state.modal = { type: 'edit-profile' }
     render()
   } else if (action === 'view-ing') {
+    state.ingViewMenuOpen = false
     state._ingDetailPortionIdx = null
     state.modal = { type: 'ing-detail', ingId: el.getAttribute('data-id') }
     render()
