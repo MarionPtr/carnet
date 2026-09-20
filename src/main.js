@@ -17,6 +17,12 @@ import {
   addCategory,
   renameCategory,
   deleteCategory,
+  loadFamilies,
+  loadCategoryFamilies,
+  addFamily,
+  renameFamily,
+  deleteFamily,
+  setCategoryFamily,
   loadRecipeTypes,
   addRecipeType,
   renameRecipeType,
@@ -48,6 +54,7 @@ const DISPLAY_PREF_FIELDS = [
   'ingVisibleCategories',
   'ingFavoritesOnly',
   'collapsedCategories',
+  'collapsedFamilies',
   'recipeViewMode',
   'recipeLayout',
   'recipeVisibleTypes',
@@ -118,7 +125,10 @@ const state = {
   toastMsg: null,
   ingSearch: '',
   collapsedCategories: savedPrefs.collapsedCategories || {},
-  ingViewMode: savedPrefs.ingViewMode || 'category', // 'category' ou 'alphabetical'
+  collapsedFamilies: savedPrefs.collapsedFamilies || {},
+  families: [], // [{ id, name }]
+  categoryFamily: {}, // { nomCatégorie: idFamille }
+  ingViewMode: savedPrefs.ingViewMode || 'category', // 'category', 'family' ou 'alphabetical'
   ingLayout: savedPrefs.ingLayout || 'list', // 'list' ou 'cards'
   ingVisibleCategories: savedPrefs.ingVisibleCategories || null, // null = toutes visibles, sinon tableau de catégories cochées
   ingFavoritesOnly: !!savedPrefs.ingFavoritesOnly,
@@ -181,6 +191,8 @@ async function init() {
     state.profile = await loadProfile(state.currentPerson)
     state.logs = await loadLogs(state.currentDate, state.currentPerson)
     state.categories = await loadCategories()
+    state.families = await loadFamilies()
+    state.categoryFamily = await loadCategoryFamilies()
     state.recipeTypes = await loadRecipeTypes()
   } catch (e) {
     console.error('Erreur lors du chargement:', e)
@@ -432,6 +444,48 @@ function datePickerForm() {
 }
 
 // ========== INGREDIENTS ==========
+function chevronHtml(isCollapsed) {
+  return '<span style="color:var(--text-muted);display:inline-flex;padding:4px;transform:rotate(' + (isCollapsed ? '-90deg' : '0deg') + ');transition:transform .15s ease;">'
+    + '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'
+    + '</span>'
+}
+
+// Regroupe des catégories par famille ; celles sans famille vont dans « Sans famille »
+function groupCategoriesByFamily(cats) {
+  const groups = []
+  state.families.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach(f => {
+    const list = cats.filter(c => state.categoryFamily[c] === f.id)
+    if (list.length) groups.push({ key: f.id, name: f.name, cats: list })
+  })
+  const orphans = cats.filter(c => !state.families.some(f => f.id === state.categoryFamily[c]))
+  if (orphans.length) groups.push({ key: '__none__', name: 'Sans famille', cats: orphans })
+  return groups
+}
+
+function ingCategorySectionHtml(cat, list, nested) {
+  const isCollapsed = !state.ingSearch && state.collapsedCategories[cat] !== false
+  let h = '<div data-action="toggle-category" data-cat="' + esc(cat) + '" style="display:flex;align-items:center;justify-content:space-between;margin:' + (nested ? '8px 0' : '16px 0 8px') + ';cursor:pointer;">'
+  h += '<h4 style="font-size:' + (nested ? 'var(--text-body)' : 'var(--text-h3)') + ';font-weight:' + (nested ? '600' : '700') + ';margin:0;">' + esc(cat) + '</h4>'
+  h += chevronHtml(isCollapsed)
+  h += '</div>'
+  if (!isCollapsed) h += ingGroupHtml(list)
+  return h
+}
+
+function ingFamilySectionHtml(group, grouped) {
+  const isCollapsed = !state.ingSearch && state.collapsedFamilies[group.key] !== false
+  let h = '<div data-action="toggle-family" data-fam="' + esc(group.key) + '" style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 8px;cursor:pointer;">'
+  h += '<h3 style="font-size:var(--text-h2);font-weight:700;margin:0;">' + esc(group.name) + '</h3>'
+  h += chevronHtml(isCollapsed)
+  h += '</div>'
+  if (!isCollapsed) {
+    h += '<div style="margin-left:2px;padding-left:12px;border-left:2px solid var(--border);">'
+    group.cats.forEach(cat => { h += ingCategorySectionHtml(cat, grouped[cat], true) })
+    h += '</div>'
+  }
+  return h
+}
+
 function ingThumbHtml(i, size, emojiSize) {
   return i.photo
     ? '<img src="' + esc(i.photo) + '" style="width:100%;height:' + size + ';object-fit:cover;display:block;"/>'
@@ -497,7 +551,7 @@ function renderIngredients() {
   h += '</header>'
   h += '<section>'
   const isFilterActive = state.ingVisibleCategories !== null || state.ingFavoritesOnly
-  const isViewCustom = state.ingViewMode === 'alphabetical' || state.ingLayout === 'cards'
+  const isViewCustom = state.ingViewMode !== 'category' || state.ingLayout === 'cards'
   h += '<div style="display:flex;gap:8px;position:relative;">'
   h += '<div class="search-wrap" style="position:relative;flex:1;margin-bottom:0;">'
   h += '<input placeholder="Rechercher…" id="ing-search" value="' + esc(state.ingSearch) + '" style="' + (state.ingSearch ? 'padding-right:36px;' : '') + '"/>'
@@ -521,31 +575,29 @@ function renderIngredients() {
   h += '</div>'
 
   const useAlphabetical = state.ingViewMode === 'alphabetical'
+  const useFamily = state.ingViewMode === 'family'
   const alphaList = filtered.slice().sort((a, b) => a.name.localeCompare(b.name))
+  const visibleCategories = state.ingVisibleCategories === null
+    ? categories
+    : categories.filter(cat => state.ingVisibleCategories.includes(cat))
 
   if (filtered.length === 0) {
     h += '<div class="empty">Aucun ingrédient. Ajoute-en un pour commencer.</div>'
   } else if (useAlphabetical) {
     h += ingGroupHtml(alphaList)
   } else {
-    const visibleCategories = state.ingVisibleCategories === null
-      ? categories
-      : categories.filter(cat => state.ingVisibleCategories.includes(cat))
     if (visibleCategories.length === 0) {
       h += '<div class="empty">Aucune catégorie sélectionnée. Ouvre le filtre pour en choisir.</div>'
     }
-    visibleCategories.forEach(cat => {
-      const isCollapsed = !state.ingSearch && state.collapsedCategories[cat] !== false
-      h += '<div data-action="toggle-category" data-cat="' + esc(cat) + '" style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px;cursor:pointer;">'
-      h += '<h4 style="font-size:var(--text-h3);font-weight:700;margin:0;">' + esc(cat) + '</h4>'
-      h += '<span style="color:var(--text-muted);display:inline-flex;padding:4px;transform:rotate(' + (isCollapsed ? '-90deg' : '0deg') + ');transition:transform .15s ease;">'
-      h += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'
-      h += '</span>'
-      h += '</div>'
-      if (!isCollapsed) {
-        h += ingGroupHtml(grouped[cat])
-      }
-    })
+    if (useFamily) {
+      groupCategoriesByFamily(visibleCategories).forEach(group => {
+        h += ingFamilySectionHtml(group, grouped)
+      })
+    } else {
+      visibleCategories.forEach(cat => {
+        h += ingCategorySectionHtml(cat, grouped[cat], false)
+      })
+    }
   }
 
   h += '</section>'
@@ -569,19 +621,31 @@ function ingFilterForm() {
   h += '<input type="checkbox" data-action="toggle-fav-filter" style="width:auto;" ' + (state.ingFavoritesOnly ? 'checked' : '') + '/>'
   h += '</label>'
 
-  if (state.ingViewMode === 'category') {
+  if (state.ingViewMode !== 'alphabetical') {
     const allSelected = state.ingVisibleCategories === null
+    const isChecked = cat => state.ingVisibleCategories === null || state.ingVisibleCategories.includes(cat)
     h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
     h += '<span class="lbl" style="margin:0;">Catégories visibles</span>'
     h += '<button type="button" data-action="' + (allSelected ? 'ing-select-none' : 'ing-select-all') + '" style="background:none;border:none;color:var(--protein);font-size:var(--text-body);font-weight:600;padding:6px 0 6px 10px;cursor:pointer;">' + (allSelected ? 'Tout désélectionner' : 'Tout sélectionner') + '</button>'
     h += '</div>'
-    state.categories.forEach(cat => {
-      const checked = state.ingVisibleCategories === null || state.ingVisibleCategories.includes(cat)
-      h += '<label class="list-item" style="cursor:pointer;">'
-      h += '<span>' + esc(cat) + '</span>'
-      h += '<input type="checkbox" data-action="toggle-ing-visible-category" data-cat="' + esc(cat) + '" style="width:auto;" ' + (checked ? 'checked' : '') + '/>'
-      h += '</label>'
-    })
+    const categoryRow = (cat, indent) => {
+      let r = '<label class="list-item" style="cursor:pointer;' + (indent ? 'padding-left:16px;' : '') + '">'
+      r += '<span>' + esc(cat) + '</span>'
+      r += '<input type="checkbox" data-action="toggle-ing-visible-category" data-cat="' + esc(cat) + '" style="width:auto;" ' + (isChecked(cat) ? 'checked' : '') + '/>'
+      return r + '</label>'
+    }
+    if (state.families.length === 0) {
+      state.categories.forEach(cat => { h += categoryRow(cat, false) })
+    } else {
+      groupCategoriesByFamily(state.categories).forEach(group => {
+        const groupChecked = group.cats.every(isChecked)
+        h += '<label class="list-item" style="cursor:pointer;">'
+        h += '<span style="font-weight:700;">' + esc(group.name) + '</span>'
+        h += '<input type="checkbox" data-action="toggle-ing-visible-family" data-fam="' + esc(group.key) + '" style="width:auto;" ' + (groupChecked ? 'checked' : '') + '/>'
+        h += '</label>'
+        group.cats.forEach(cat => { h += categoryRow(cat, true) })
+      })
+    }
   }
 
   return h
@@ -704,10 +768,13 @@ function recipeViewMenuHtml() {
 function ingViewMenuHtml() {
   const mode = state.ingViewMode
   const keys = ingGroupKeys()
+  const familyKeys = state.families.map(f => f.id).concat('__none__')
   const allExpanded = keys.length > 0 && keys.every(c => state.collapsedCategories[c] === false)
+    && (mode !== 'family' || familyKeys.every(f => state.collapsedFamilies[f] === false))
   const groups = [
     [
       { label: 'Par catégorie', checked: mode === 'category', attrs: 'data-action="set-ing-view-mode" data-mode="category"' },
+      { label: 'Par famille', checked: mode === 'family', attrs: 'data-action="set-ing-view-mode" data-mode="family"' },
       { label: 'Liste alphabétique', checked: mode === 'alphabetical', attrs: 'data-action="set-ing-view-mode" data-mode="alphabetical"' }
     ],
     [
@@ -715,7 +782,7 @@ function ingViewMenuHtml() {
       { label: 'Liste', checked: state.ingLayout !== 'cards', attrs: 'data-action="set-ing-layout" data-layout="list"', icon: 'list' }
     ]
   ]
-  if (mode === 'category') {
+  if (mode !== 'alphabetical') {
     groups.push([
       { label: 'Sections repliées', checked: !allExpanded, attrs: 'data-action="set-ing-collapse-all" data-collapsed="true"' },
       { label: 'Sections dépliées', checked: allExpanded, attrs: 'data-action="set-ing-collapse-all" data-collapsed="false"' }
@@ -974,6 +1041,25 @@ function renderProfile() {
 function settingsPageBody() {
   let h = ''
 
+  // === FAMILLES ===
+  h += '<h3 style="margin:0 0 4px;">Familles</h3>'
+  h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-bottom:12px;">Une famille regroupe plusieurs catégories d\'ingrédients.</div>'
+  h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">'
+  state.families.forEach(f => {
+    const count = state.categories.filter(c => state.categoryFamily[c] === f.id).length
+    h += '<div style="display:flex;align-items:center;gap:4px;padding:6px 10px;background:var(--surface-raised);border-radius:8px;font-size:var(--text-small);">'
+    h += '<span>' + esc(f.name) + '</span>'
+    h += '<span style="color:var(--text-muted);">(' + count + ')</span>'
+    h += '<button class="icon-btn" data-action="edit-family" data-id="' + esc(f.id) + '" style="font-size:var(--text-small);padding:0;margin:0;opacity:0.6;">✎</button>'
+    h += '<button class="icon-btn" data-action="rm-family" data-id="' + esc(f.id) + '" style="font-size:var(--text-small);padding:0;margin:0;">✕</button>'
+    h += '</div>'
+  })
+  h += '</div>'
+  h += '<div style="display:flex;gap:6px;margin-bottom:24px;">'
+  h += '<input id="new-family-input" placeholder="Nouvelle famille" style="flex:1;"/>'
+  h += '<button class="btn small" data-action="add-family">+</button>'
+  h += '</div>'
+
   // === CATÉGORIES ===
   h += '<h3 style="margin:0 0 12px;">Catégories d\'ingrédients</h3>'
   h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">'
@@ -1062,6 +1148,7 @@ function renderModal() {
   else if (m.type === 'add-log') body = addLogForm()
   else if (m.type === 'edit-profile') body = editProfileForm()
   else if (m.type === 'edit-category') body = editCategoryForm(m.categoryIdx)
+  else if (m.type === 'edit-family') body = editFamilyForm(m.familyId)
   else if (m.type === 'date-picker') body = datePickerForm()
   else if (m.type === 'ing-filter') body = ingFilterForm()
   else if (m.type === 'recipe-filter') body = recipeFilterForm()
@@ -1443,11 +1530,28 @@ function editCategoryForm(idx) {
 
   let h = '<h2>Modifier la catégorie</h2>'
   h += '<label class="field"><span class="lbl">Nom</span><input id="edit-cat-input" value="' + esc(currentName) + '"/></label>'
+  h += '<label class="field"><span class="lbl">Famille</span><select id="edit-cat-family">'
+  h += '<option value="">Aucune</option>'
+  state.families.forEach(f => {
+    h += '<option value="' + esc(f.id) + '"' + (state.categoryFamily[currentName] === f.id ? ' selected' : '') + '>' + esc(f.name) + '</option>'
+  })
+  h += '</select></label>'
   h += '<div class="row2">'
   h += '<button class="btn primary block" data-action="save-category" data-idx="' + idx + '">Enregistrer</button>'
   h += '<button class="btn block" data-action="close-modal">Annuler</button>'
   h += '</div>'
 
+  return h
+}
+
+function editFamilyForm(id) {
+  const fam = state.families.find(f => f.id === id)
+  let h = '<h2>Modifier la famille</h2>'
+  h += '<label class="field"><span class="lbl">Nom</span><input id="edit-family-input" value="' + esc(fam ? fam.name : '') + '"/></label>'
+  h += '<div class="row2">'
+  h += '<button class="btn primary block" data-action="save-family" data-id="' + esc(id) + '">Enregistrer</button>'
+  h += '<button class="btn block" data-action="close-modal">Annuler</button>'
+  h += '</div>'
   return h
 }
 
@@ -1995,6 +2099,9 @@ function handleAction(action, el) {
     ingGroupKeys().forEach(c => {
       state.collapsedCategories[c] = collapsed
     })
+    state.families.map(f => f.id).concat('__none__').forEach(f => {
+      state.collapsedFamilies[f] = collapsed
+    })
     state.ingViewMenuOpen = false
     render()
   } else if (action === 'open-ing-filter') {
@@ -2020,6 +2127,23 @@ function handleAction(action, el) {
       saveIngredient(ing)
       render()
     }
+  } else if (action === 'toggle-family') {
+    const fam = el.getAttribute('data-fam')
+    state.collapsedFamilies[fam] = !(state.collapsedFamilies[fam] !== false)
+    render()
+  } else if (action === 'toggle-ing-visible-family') {
+    const fam = el.getAttribute('data-fam')
+    const group = groupCategoriesByFamily(state.categories).find(g => g.key === fam)
+    if (group) {
+      let visible = state.ingVisibleCategories === null ? state.categories.slice() : state.ingVisibleCategories.slice()
+      if (el.checked) {
+        group.cats.forEach(c => { if (!visible.includes(c)) visible.push(c) })
+      } else {
+        visible = visible.filter(c => !group.cats.includes(c))
+      }
+      state.ingVisibleCategories = visible.length >= state.categories.length ? null : visible
+    }
+    render()
   } else if (action === 'ing-select-none') {
     state.ingVisibleCategories = []
     render()
@@ -2480,6 +2604,52 @@ function handleAction(action, el) {
     } else {
       showToast('Cette catégorie existe déjà')
     }
+  } else if (action === 'add-family') {
+    const input = document.getElementById('new-family-input')
+    const name = input.value.trim()
+    if (!name) {
+      showToast('Saisis le nom de la famille')
+      return
+    }
+    if (state.families.some(f => f.name === name)) {
+      showToast('Cette famille existe déjà')
+      return
+    }
+    input.value = ''
+    addFamily(name).then(fam => {
+      state.families.push(fam)
+      state.families.sort((a, b) => a.name.localeCompare(b.name))
+      render()
+    }).catch(() => showToast('Impossible de créer la famille'))
+  } else if (action === 'edit-family') {
+    state.modal = { type: 'edit-family', familyId: el.getAttribute('data-id') }
+    render()
+  } else if (action === 'save-family') {
+    const id = el.getAttribute('data-id')
+    const name = document.getElementById('edit-family-input').value.trim()
+    if (!name) {
+      showToast('Saisis un nom pour la famille')
+      return
+    }
+    if (state.families.some(f => f.name === name && f.id !== id)) {
+      showToast('Cette famille existe déjà')
+      return
+    }
+    const fam = state.families.find(f => f.id === id)
+    if (fam) fam.name = name
+    state.families.sort((a, b) => a.name.localeCompare(b.name))
+    renameFamily(id, name)
+    state.modal = null
+    render()
+    showToast('Famille modifiée')
+  } else if (action === 'rm-family') {
+    const id = el.getAttribute('data-id')
+    state.families = state.families.filter(f => f.id !== id)
+    Object.keys(state.categoryFamily).forEach(c => {
+      if (state.categoryFamily[c] === id) delete state.categoryFamily[c]
+    })
+    deleteFamily(id)
+    render()
   } else if (action === 'edit-category') {
     const idx = parseInt(el.getAttribute('data-idx'))
     state.modal = { type: 'edit-category', categoryIdx: idx }
@@ -2496,11 +2666,19 @@ function handleAction(action, el) {
       showToast('Cette catégorie existe déjà')
       return
     }
+    const familySelect = document.getElementById('edit-cat-family')
+    const newFamily = familySelect && familySelect.value ? familySelect.value : null
     state.categories[idx] = newName
     state.ingredients.forEach(i => {
       if (i.category === oldName) i.category = newName
     })
-    renameCategory(oldName, newName)
+    if (oldName !== newName) {
+      delete state.categoryFamily[oldName]
+      renameCategory(oldName, newName)
+    }
+    if (newFamily) state.categoryFamily[newName] = newFamily
+    else delete state.categoryFamily[newName]
+    setCategoryFamily(newName, newFamily)
     state.modal = null
     render()
     showToast('Catégorie modifiée')
@@ -2508,6 +2686,7 @@ function handleAction(action, el) {
     const idx = parseInt(el.getAttribute('data-idx'))
     const name = state.categories[idx]
     state.categories.splice(idx, 1)
+    delete state.categoryFamily[name]
     deleteCategory(name)
     render()
   } else if (action === 'add-recipe-type') {

@@ -289,6 +289,91 @@ export async function deleteCategory(name) {
   }
 }
 
+// Charger les familles (regroupements de catégories)
+export async function loadFamilies() {
+  const { data, error } = await supabase
+    .from('families')
+    .select('*')
+    .order('name')
+
+  if (error) {
+    console.error('Erreur chargement familles:', error)
+    return []
+  }
+  return data || []
+}
+
+// Charger le lien catégorie -> famille, sous la forme { nomCatégorie: idFamille }
+export async function loadCategoryFamilies() {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('name, family_id')
+
+  if (error) {
+    console.error('Erreur chargement familles des catégories:', error)
+    return {}
+  }
+  const map = {}
+  ;(data || []).forEach(c => {
+    if (c.family_id) map[c.name] = c.family_id
+  })
+  return map
+}
+
+// Ajouter une famille (renvoie la famille créée, avec son id)
+export async function addFamily(name) {
+  const { data, error } = await supabase
+    .from('families')
+    .insert([{ name }])
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Erreur ajout famille:', error)
+    throw error
+  }
+  return data
+}
+
+// Renommer une famille
+export async function renameFamily(id, newName) {
+  const { error } = await supabase
+    .from('families')
+    .update({ name: newName })
+    .eq('id', id)
+
+  if (error) {
+    console.error('Erreur renommage famille:', error)
+    throw error
+  }
+}
+
+// Supprimer une famille (ses catégories restent, sans famille)
+export async function deleteFamily(id) {
+  const { error } = await supabase
+    .from('families')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    console.error('Erreur suppression famille:', error)
+    throw error
+  }
+}
+
+// Rattacher une catégorie à une famille (familyId = null pour la détacher)
+export async function setCategoryFamily(categoryName, familyId) {
+  const { error } = await supabase
+    .from('categories')
+    .update({ family_id: familyId })
+    .eq('name', categoryName)
+
+  if (error) {
+    console.error('Erreur mise à jour famille de la catégorie:', error)
+    throw error
+  }
+}
+
 // Charger les types de recette
 export async function loadRecipeTypes() {
   const { data, error } = await supabase
