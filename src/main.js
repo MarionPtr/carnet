@@ -48,6 +48,7 @@ const DISPLAY_PREF_FIELDS = [
   'ingFavoritesOnly',
   'collapsedCategories',
   'recipeViewMode',
+  'recipeLayout',
   'recipeVisibleTypes',
   'recipeFavoritesOnly',
   'collapsedRecipeTypes'
@@ -121,6 +122,7 @@ const state = {
   ingFavoritesOnly: !!savedPrefs.ingFavoritesOnly,
   recipeSearch: '',
   recipeViewMode: savedPrefs.recipeViewMode || 'category', // 'category' ou 'alphabetical'
+  recipeLayout: savedPrefs.recipeLayout || 'list', // 'list' ou 'cards'
   recipeVisibleTypes: savedPrefs.recipeVisibleTypes || null, // null = tous visibles, sinon tableau de types cochés
   recipeFavoritesOnly: !!savedPrefs.recipeFavoritesOnly,
   collapsedRecipeTypes: savedPrefs.collapsedRecipeTypes || {},
@@ -599,6 +601,36 @@ function recipeRowHtml(r, isLast) {
   return h
 }
 
+function recipeCardHtml(r) {
+  const m = recipeMacrosPerServing(r, state.ingredients)
+  let h = '<div data-action="view-recipe" data-id="' + r.id + '" style="cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;min-width:0;">'
+  h += '<div style="width:100%;aspect-ratio:4/3;background:var(--surface-raised);">'
+  h += r.photo
+    ? '<img src="' + esc(r.photo) + '" style="width:100%;height:100%;object-fit:cover;display:block;"/>'
+    : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:40px;">🍽️</div>'
+  h += '</div>'
+  h += '<div style="padding:10px 12px 12px;">'
+  h += '<div style="font-size:var(--text-body);font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + (r.is_favorite ? '⭐ ' : '') + esc(r.name) + '</div>'
+  h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:4px;">' + round(m.kcal) + ' kcal / portion</div>'
+  h += '</div></div>'
+  return h
+}
+
+function recipeGroupHtml(list) {
+  if (state.recipeLayout === 'cards') {
+    let h = '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:20px;">'
+    list.forEach(r => {
+      h += recipeCardHtml(r)
+    })
+    return h + '</div>'
+  }
+  let h = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;">'
+  list.forEach((r, idx) => {
+    h += recipeRowHtml(r, idx === list.length - 1)
+  })
+  return h + '</div>'
+}
+
 function renderRecipes() {
   const q = state.recipeSearch.toLowerCase()
   const filtered = state.recipes.filter(r => r.name.toLowerCase().indexOf(q) > -1 && (!state.recipeFavoritesOnly || r.is_favorite))
@@ -636,19 +668,13 @@ function renderRecipes() {
   h += '</button>'
   h += '</div>'
 
-  const listWrapStyle = 'background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;'
-
   if (state.recipes.length === 0) {
     h += '<div class="empty">Aucune recette. Crée-en une à partir de tes ingrédients.</div>'
   } else if (filtered.length === 0) {
     h += '<div class="empty">Aucune recette trouvée.</div>'
   } else if (state.recipeViewMode === 'alphabetical') {
     const alphaList = filtered.slice().sort((a, b) => a.name.localeCompare(b.name))
-    h += '<div style="' + listWrapStyle + 'margin-top:16px;">'
-    alphaList.forEach((r, idx) => {
-      h += recipeRowHtml(r, idx === alphaList.length - 1)
-    })
-    h += '</div>'
+    h += '<div style="margin-top:16px;">' + recipeGroupHtml(alphaList) + '</div>'
   } else {
     const visibleTypes = state.recipeVisibleTypes === null
       ? types
@@ -662,11 +688,7 @@ function renderRecipes() {
       h += '</span>'
       h += '</div>'
       if (!isCollapsed) {
-        h += '<div style="' + listWrapStyle + '">'
-        grouped[type].forEach((r, idx) => {
-          h += recipeRowHtml(r, idx === grouped[type].length - 1)
-        })
-        h += '</div>'
+        h += recipeGroupHtml(grouped[type])
       }
     })
   }
@@ -681,6 +703,12 @@ function recipeFilterForm() {
   h += '<div class="segmented" style="margin-bottom:20px;">'
   h += '<button type="button" class="' + (mode === 'category' ? 'active' : '') + '" data-action="set-recipe-view-mode" data-mode="category">Par type</button>'
   h += '<button type="button" class="' + (mode === 'alphabetical' ? 'active' : '') + '" data-action="set-recipe-view-mode" data-mode="alphabetical">Liste alphabétique</button>'
+  h += '</div>'
+
+  h += '<span class="lbl" style="display:block;margin-bottom:10px;">Présentation</span>'
+  h += '<div class="segmented" style="margin-bottom:20px;">'
+  h += '<button type="button" class="' + (state.recipeLayout !== 'cards' ? 'active' : '') + '" data-action="set-recipe-layout" data-layout="list">Liste</button>'
+  h += '<button type="button" class="' + (state.recipeLayout === 'cards' ? 'active' : '') + '" data-action="set-recipe-layout" data-layout="cards">Cartes</button>'
   h += '</div>'
 
   if (mode === 'category') {
@@ -1921,6 +1949,9 @@ function handleAction(action, el) {
     render()
   } else if (action === 'open-recipe-filter') {
     state.modal = { type: 'recipe-filter' }
+    render()
+  } else if (action === 'set-recipe-layout') {
+    state.recipeLayout = el.getAttribute('data-layout')
     render()
   } else if (action === 'set-recipe-view-mode') {
     state.recipeViewMode = el.getAttribute('data-mode')
