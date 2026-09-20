@@ -602,15 +602,17 @@ function recipeRowHtml(r, isLast) {
 function recipeCardHtml(r) {
   const m = recipeMacrosPerServing(r, state.ingredients)
   let h = '<div data-action="view-recipe" data-id="' + r.id + '" style="cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;min-width:0;">'
-  h += '<div style="position:relative;width:100%;aspect-ratio:4/3;background:var(--surface-raised);">'
+  h += '<div style="width:100%;aspect-ratio:4/3;background:var(--surface-raised);">'
   h += r.photo
     ? '<img src="' + esc(r.photo) + '" style="width:100%;height:100%;object-fit:cover;display:block;"/>'
     : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:40px;">🍽️</div>'
-  h += '<button data-action="toggle-recipe-favorite" data-id="' + r.id + '" title="Favori" style="position:absolute;top:8px;right:8px;width:34px;height:34px;border-radius:50%;border:none;background:rgba(0,0,0,0.5);cursor:pointer;font-size:20px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;color:' + (r.is_favorite ? 'var(--protein)' : '#fff') + ';">' + (r.is_favorite ? '★' : '☆') + '</button>'
   h += '</div>'
-  h += '<div style="padding:10px 12px 12px;">'
-  h += '<div style="font-size:var(--text-body);font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + esc(r.name) + '</div>'
-  h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:4px;">' + round(m.kcal) + ' kcal / portion</div>'
+  h += '<div style="padding:10px 6px 12px 12px;">'
+  h += '<div style="display:flex;align-items:flex-start;gap:2px;">'
+  h += '<div style="flex:1;min-width:0;font-size:var(--text-body);font-weight:600;line-height:1.3;padding-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + esc(r.name) + '</div>'
+  h += '<button data-action="toggle-recipe-favorite" data-id="' + r.id + '" title="Favori" style="flex-shrink:0;width:30px;height:28px;background:none;border:none;cursor:pointer;font-size:22px;line-height:1;padding:0;color:' + (r.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (r.is_favorite ? '★' : '☆') + '</button>'
+  h += '</div>'
+  h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;padding-right:6px;">' + round(m.kcal) + ' kcal / portion</div>'
   h += '</div></div>'
   return h
 }
