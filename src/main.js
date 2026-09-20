@@ -44,6 +44,7 @@ const PERSON_STORAGE_KEY = 'carnet_person'
 const DISPLAY_PREFS_KEY = 'carnet_display_prefs'
 const DISPLAY_PREF_FIELDS = [
   'ingViewMode',
+  'ingLayout',
   'ingVisibleCategories',
   'ingFavoritesOnly',
   'collapsedCategories',
@@ -118,6 +119,7 @@ const state = {
   ingSearch: '',
   collapsedCategories: savedPrefs.collapsedCategories || {},
   ingViewMode: savedPrefs.ingViewMode || 'category', // 'category' ou 'alphabetical'
+  ingLayout: savedPrefs.ingLayout || 'list', // 'list' ou 'cards'
   ingVisibleCategories: savedPrefs.ingVisibleCategories || null, // null = toutes visibles, sinon tableau de catégories cochées
   ingFavoritesOnly: !!savedPrefs.ingFavoritesOnly,
   recipeSearch: '',
@@ -430,6 +432,46 @@ function datePickerForm() {
 }
 
 // ========== INGREDIENTS ==========
+function ingThumbHtml(i, size, emojiSize) {
+  return i.photo
+    ? '<img src="' + esc(i.photo) + '" style="width:100%;height:' + size + ';object-fit:cover;display:block;"/>'
+    : '<div style="width:100%;height:' + size + ';display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:' + emojiSize + ';">🥘</div>'
+}
+
+function ingRowHtml(i, isLast) {
+  let h = '<div class="list-item" style="cursor:pointer;padding:10px 12px;border-bottom:' + (isLast ? 'none' : '1px solid var(--border)') + ';" data-action="view-ing" data-id="' + i.id + '">'
+  h += '<div style="width:56px;height:56px;flex-shrink:0;border-radius:10px;overflow:hidden;margin-right:12px;background:var(--surface-raised);border:1px solid var(--border);">'
+  h += ingThumbHtml(i, '100%', 'var(--text-h2)')
+  h += '</div>'
+  h += '<div style="flex:1;"><div class="name" style="font-size:var(--text-h3);font-weight:600;">' + (i.is_favorite ? '⭐ ' : '') + esc(i.name) + '</div></div>'
+  h += '<div style="color:var(--text-muted);font-size:28px;line-height:1;flex-shrink:0;padding-left:6px;">›</div>'
+  h += '</div>'
+  return h
+}
+
+function ingCardHtml(i) {
+  let h = '<div data-action="view-ing" data-id="' + i.id + '" style="cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;min-width:0;">'
+  h += '<div style="width:100%;aspect-ratio:4/3;background:var(--surface-raised);overflow:hidden;">'
+  h += ingThumbHtml(i, '100%', '34px')
+  h += '</div>'
+  h += '<div style="padding:10px 12px 12px;">'
+  h += '<div style="font-size:var(--text-body);font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + (i.is_favorite ? '⭐ ' : '') + esc(i.name) + '</div>'
+  h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + round(i.kcal) + ' kcal / 100 ' + esc(i.unit || 'g') + '</div>'
+  h += '</div></div>'
+  return h
+}
+
+function ingGroupHtml(list) {
+  if (state.ingLayout === 'cards') {
+    let h = '<div class="card-grid" style="margin-bottom:20px;">'
+    list.forEach(i => { h += ingCardHtml(i) })
+    return h + '</div>'
+  }
+  let h = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;">'
+  list.forEach((i, idx) => { h += ingRowHtml(i, idx === list.length - 1) })
+  return h + '</div>'
+}
+
 function renderIngredients() {
   const q = state.ingSearch.toLowerCase()
   const filtered = state.ingredients.filter(i => i.name.toLowerCase().indexOf(q) > -1 && (!state.ingFavoritesOnly || i.is_favorite))
@@ -455,7 +497,7 @@ function renderIngredients() {
   h += '</header>'
   h += '<section>'
   const isFilterActive = state.ingVisibleCategories !== null || state.ingFavoritesOnly
-  const isViewCustom = state.ingViewMode === 'alphabetical'
+  const isViewCustom = state.ingViewMode === 'alphabetical' || state.ingLayout === 'cards'
   h += '<div style="display:flex;gap:8px;position:relative;">'
   h += '<div class="search-wrap" style="position:relative;flex:1;margin-bottom:0;">'
   h += '<input placeholder="Rechercher…" id="ing-search" value="' + esc(state.ingSearch) + '" style="' + (state.ingSearch ? 'padding-right:36px;' : '') + '"/>'
@@ -484,21 +526,7 @@ function renderIngredients() {
   if (filtered.length === 0) {
     h += '<div class="empty">Aucun ingrédient. Ajoute-en un pour commencer.</div>'
   } else if (useAlphabetical) {
-    h += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;">'
-    alphaList.forEach((i, idx) => {
-      h += '<div class="list-item" style="cursor:pointer;padding:10px 12px;border-bottom:' + (idx < alphaList.length - 1 ? '1px solid var(--border)' : 'none') + ';" data-action="view-ing" data-id="' + i.id + '">'
-      h += '<div style="width:56px;height:56px;flex-shrink:0;border-radius:10px;overflow:hidden;margin-right:12px;background:var(--surface-raised);border:1px solid var(--border);">'
-      if (i.photo) {
-        h += '<img src="' + i.photo + '" style="width:100%;height:100%;object-fit:cover;"/>'
-      } else {
-        h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h2);">🥘</div>'
-      }
-      h += '</div>'
-      h += '<div style="flex:1;"><div class="name" style="font-size:var(--text-h3);font-weight:600;">' + (i.is_favorite ? '⭐ ' : '') + esc(i.name) + '</div></div>'
-      h += '<div style="color:var(--text-muted);font-size:28px;line-height:1;flex-shrink:0;padding-left:6px;">›</div>'
-      h += '</div>'
-    })
-    h += '</div>'
+    h += ingGroupHtml(alphaList)
   } else {
     const visibleCategories = state.ingVisibleCategories === null
       ? categories
@@ -512,23 +540,7 @@ function renderIngredients() {
       h += '</span>'
       h += '</div>'
       if (!isCollapsed) {
-        h += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;">'
-        grouped[cat].forEach((i, idx) => {
-          h += '<div class="list-item" style="cursor:pointer;padding:10px 12px;border-bottom:' + (idx < grouped[cat].length - 1 ? '1px solid var(--border)' : 'none') + ';" data-action="view-ing" data-id="' + i.id + '">'
-          // Thumbnail
-          h += '<div style="width:56px;height:56px;flex-shrink:0;border-radius:10px;overflow:hidden;margin-right:12px;background:var(--surface-raised);border:1px solid var(--border);">'
-          if (i.photo) {
-            h += '<img src="' + i.photo + '" style="width:100%;height:100%;object-fit:cover;"/>'
-          } else {
-            h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h2);">🥘</div>'
-          }
-          h += '</div>'
-          // Info
-          h += '<div style="flex:1;"><div class="name" style="font-size:var(--text-h3);font-weight:600;">' + (i.is_favorite ? '⭐ ' : '') + esc(i.name) + '</div></div>'
-          h += '<div style="color:var(--text-muted);font-size:28px;line-height:1;flex-shrink:0;padding-left:6px;">›</div>'
-          h += '</div>'
-        })
-        h += '</div>'
+        h += ingGroupHtml(grouped[cat])
       }
     })
   }
@@ -690,6 +702,10 @@ function ingViewMenuHtml() {
     [
       { label: 'Par catégorie', checked: mode === 'category', attrs: 'data-action="set-ing-view-mode" data-mode="category"' },
       { label: 'Liste alphabétique', checked: mode === 'alphabetical', attrs: 'data-action="set-ing-view-mode" data-mode="alphabetical"' }
+    ],
+    [
+      { label: 'Cartes', checked: state.ingLayout === 'cards', attrs: 'data-action="set-ing-layout" data-layout="cards"', icon: 'grid' },
+      { label: 'Liste', checked: state.ingLayout !== 'cards', attrs: 'data-action="set-ing-layout" data-layout="list"', icon: 'list' }
     ]
   ]
   if (mode === 'category') {
@@ -1980,6 +1996,10 @@ function handleAction(action, el) {
     render()
   } else if (action === 'set-ing-view-mode') {
     state.ingViewMode = el.getAttribute('data-mode')
+    state.ingViewMenuOpen = false
+    render()
+  } else if (action === 'set-ing-layout') {
+    state.ingLayout = el.getAttribute('data-layout')
     state.ingViewMenuOpen = false
     render()
   } else if (action === 'toggle-fav-filter') {

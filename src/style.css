@@ -139,6 +139,10 @@ input[type="date"]::-webkit-datetime-edit{ padding:0; }
 
 .search-wrap{ margin-bottom:12px; }
 
+/* Cartes d'ingrédients : 2 par ligne sur téléphone, 3 dès que l'écran est plus large */
+.card-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+@media (min-width:600px){ .card-grid{ grid-template-columns:repeat(3,minmax(0,1fr)); } }
+
 .pill{ display:inline-block; padding:3px 9px; border-radius:999px; font-size:var(--text-caption); font-weight:600; }
 .pill.protein{ background:rgba(228,163,60,0.16); color:var(--protein); }
 .pill.carbs{ background:rgba(123,168,138,0.16); color:var(--carbs); }
