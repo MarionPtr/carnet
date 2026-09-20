@@ -114,7 +114,15 @@ input:focus, select:focus, textarea:focus{ outline:none; border-color:var(--prot
 label.field{ display:block; margin-bottom:10px; }
 label.field .lbl{ display:block; font-size:var(--text-small); color:var(--text-muted); margin-bottom:5px; }
 .row2{ display:flex; gap:8px; }
-.row2 > *{ flex:1; }
+.row2 > *{ flex:1; min-width:0; }
+
+/* iOS Safari : le champ date natif garde une largeur/hauteur intrinsèques et centre son texte */
+input[type="date"]{
+  -webkit-appearance:none; appearance:none;
+  display:block; min-width:0; height:41px; line-height:1.2; text-align:left;
+}
+input[type="date"]::-webkit-date-and-time-value{ text-align:left; min-height:1.2em; margin:0; }
+input[type="date"]::-webkit-datetime-edit{ padding:0; }
 
 .list-item{
   display:flex; align-items:center; justify-content:space-between; gap:10px;

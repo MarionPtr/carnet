@@ -857,7 +857,6 @@ function renderProfile() {
 
   h += '<div class="list-item" style="font-size:var(--text-body);"><span>Poids actuel</span><span style="font-weight:600;">' + p.weight + ' kg</span></div>'
   h += '<div class="list-item" style="font-size:var(--text-body);"><span>Activité</span><span style="font-weight:600;">' + activityLabels[p.activity] + '</span></div>'
-  h += '<div class="list-item" style="font-size:var(--text-body);"><span>Objectif</span><span style="font-weight:600;">' + goalLabels[p.goal] + '</span></div>'
 
   h += '<button class="btn primary block" data-action="open-edit-profile" style="margin-top:16px;">Modifier</button>'
   h += '</div>'
@@ -867,7 +866,7 @@ function renderProfile() {
   h += '<button class="list-item" style="width:100%;background:none;border:none;text-align:left;cursor:pointer;color:var(--text);font-size:var(--text-body);" data-action="open-objectives">'
   h += '<div style="display:flex;align-items:center;"><span style="margin-right:10px;">🎯</span>'
   h += '<div><div style="font-size:var(--text-body);font-weight:600;">Objectifs</div>'
-  h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + targets.kcal + ' kcal / jour</div></div></div>'
+  h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + goalLabels[p.goal] + ' · ' + targets.kcal + ' kcal / jour</div></div></div>'
   h += '<span style="color:var(--text-muted);">›</span>'
   h += '</button>'
   h += '</div>'
