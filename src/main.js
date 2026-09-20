@@ -819,63 +819,63 @@ function recipeDetailBody(recipeId) {
   h += '</div>'
 
   if (r.type) {
-    h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">' + esc(r.type) + '</div>'
+    h += '<div style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">' + esc(r.type) + '</div>'
   }
   h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
-  h += '<h2 style="margin:0;">' + esc(r.name) + '</h2>'
-  h += '<button data-action="toggle-recipe-favorite" data-id="' + r.id + '" style="background:none;border:none;cursor:pointer;font-size:22px;line-height:1;padding:2px;color:' + (r.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (r.is_favorite ? '★' : '☆') + '</button>'
+  h += '<h2 style="margin:0;font-size:var(--text-h1);">' + esc(r.name) + '</h2>'
+  h += '<button data-action="toggle-recipe-favorite" data-id="' + r.id + '" style="background:none;border:none;cursor:pointer;font-size:28px;line-height:1;padding:2px;color:' + (r.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (r.is_favorite ? '★' : '☆') + '</button>'
   h += '</div>'
 
   if (r.reference_url) {
-    h += '<a href="' + esc(r.reference_url) + '" target="_blank" rel="noopener" style="display:inline-block;color:var(--protein);font-size:var(--text-small);font-weight:600;margin:6px 0 16px;text-decoration:none;">🔗 Recette de référence</a>'
+    h += '<a href="' + esc(r.reference_url) + '" target="_blank" rel="noopener" style="display:inline-block;color:var(--protein);font-size:var(--text-body);font-weight:600;margin:6px 0 16px;text-decoration:none;">🔗 Recette de référence</a>'
   } else {
     h += '<div style="margin-bottom:12px;"></div>'
   }
 
   h += '<div class="card" style="background:var(--surface-raised);padding:14px;margin-bottom:16px;">'
-  h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Valeurs nutritionnelles par part</div>'
+  h += '<div style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Valeurs nutritionnelles par part</div>'
   h += '<div style="border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:10px;">'
   h += '<div style="display:flex;justify-content:space-between;align-items:center;">'
-  h += '<div style="font-size:var(--text-small);">Énergie</div>'
-  h += '<div style="font-size:var(--text-h2);font-weight:700;">' + round(m.kcal) + ' <span style="font-size:var(--text-small);">kcal</span></div>'
+  h += '<div style="font-size:var(--text-body);">Énergie</div>'
+  h += '<div style="font-size:var(--text-h1);font-weight:700;">' + round(m.kcal) + ' <span style="font-size:var(--text-body);">kcal</span></div>'
   h += '</div></div>'
   h += '<div style="display:flex;flex-direction:column;gap:10px;">'
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Protéines</div><div style="font-weight:600;color:var(--protein);font-size:var(--text-h3);">' + round(m.protein) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Glucides</div><div style="font-weight:600;color:var(--carbs);font-size:var(--text-h3);">' + round(m.carbs) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Lipides</div><div style="font-weight:600;color:var(--fat);font-size:var(--text-h3);">' + round(m.fat) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-body);">Protéines</div><div style="font-weight:600;color:var(--protein);font-size:var(--text-h2);">' + round(m.protein) + ' <span style="font-size:var(--text-small);color:var(--text-muted);font-weight:400;">g</span></div></div>'
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-body);">Glucides</div><div style="font-weight:600;color:var(--carbs);font-size:var(--text-h2);">' + round(m.carbs) + ' <span style="font-size:var(--text-small);color:var(--text-muted);font-weight:400;">g</span></div></div>'
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-body);">Lipides</div><div style="font-weight:600;color:var(--fat);font-size:var(--text-h2);">' + round(m.fat) + ' <span style="font-size:var(--text-small);color:var(--text-muted);font-weight:400;">g</span></div></div>'
   h += '</div></div>'
 
   if ((r.items || []).length > 0) {
     const baseServings = Math.max(1, r.servings || 1)
     const viewServings = state._recipeDetailServings || baseServings
     const factor = viewServings / baseServings
-    const stepBtn = 'width:28px;height:28px;padding:0;line-height:1;border-radius:50%;background:var(--surface);color:var(--text);border:1px solid var(--border-strong);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;'
+    const stepBtn = 'width:28px;height:28px;padding:0;line-height:1;border-radius:50%;background:var(--surface);color:var(--text);border:1px solid var(--border-strong);font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;'
 
     h += '<div class="card" style="background:var(--surface-raised);padding:14px;margin-bottom:16px;">'
     h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
-    h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Ingrédients</div>'
+    h += '<div style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Ingrédients</div>'
     h += '<div style="display:flex;align-items:center;gap:10px;">'
     h += '<button data-action="recipe-servings-step" data-delta="-1" style="' + stepBtn + '">−</button>'
-    h += '<span style="font-size:var(--text-small);font-weight:600;min-width:52px;text-align:center;">' + viewServings + ' part.</span>'
+    h += '<span style="font-size:var(--text-body);font-weight:600;min-width:68px;text-align:center;">' + viewServings + ' part.</span>'
     h += '<button data-action="recipe-servings-step" data-delta="1" style="' + stepBtn + '">+</button>'
     h += '</div></div>'
     r.items.forEach((it, idx) => {
       const ing = state.ingredients.find(i => i.id === it.ingredient_id)
-      h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);padding:6px 0;' + (idx < r.items.length - 1 ? 'border-bottom:1px solid var(--border);' : '') + '"><div>' + (ing ? esc(ing.name) : 'Ingrédient supprimé') + '</div><div style="font-weight:500;">' + round(it.grams * factor, 1) + ' ' + (ing && ing.unit ? esc(ing.unit) : 'g') + '</div></div>'
+      h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-body);padding:6px 0;' + (idx < r.items.length - 1 ? 'border-bottom:1px solid var(--border);' : '') + '"><div>' + (ing ? esc(ing.name) : 'Ingrédient supprimé') + '</div><div style="font-weight:500;">' + round(it.grams * factor, 1) + ' ' + (ing && ing.unit ? esc(ing.unit) : 'g') + '</div></div>'
     })
     h += '</div>'
   }
 
   if (r.instructions && r.instructions.trim()) {
     h += '<div class="card" style="background:var(--surface-raised);padding:14px;margin-bottom:16px;">'
-    h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Instructions</div>'
-    h += '<div style="font-size:var(--text-small);line-height:1.5;white-space:pre-wrap;">' + esc(r.instructions) + '</div>'
+    h += '<div style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Instructions</div>'
+    h += '<div style="font-size:var(--text-body);line-height:1.5;white-space:pre-wrap;">' + esc(r.instructions) + '</div>'
     h += '</div>'
   }
 
   h += '<div class="row2">'
-  h += '<button class="btn primary" data-action="edit-recipe" data-id="' + r.id + '">Modifier</button>'
-  h += '<button class="btn danger-outline" data-action="del-recipe" data-id="' + r.id + '">Supprimer</button>'
+  h += '<button class="btn primary" data-action="edit-recipe" data-id="' + r.id + '" style="font-size:var(--text-h3);padding:12px 14px;">Modifier</button>'
+  h += '<button class="btn danger-outline" data-action="del-recipe" data-id="' + r.id + '" style="font-size:var(--text-h3);padding:12px 14px;">Supprimer</button>'
   h += '</div>'
 
   return h
