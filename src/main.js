@@ -821,19 +821,12 @@ function renderProfile() {
   h += '</div>'
 
   // === SECTION OBJECTIFS ===
-  h += '<div class="card"><h3 style="margin:0 0 12px;">Objectifs</h3>'
-  h += '<div style="margin-bottom:12px;">'
-  h += '<div style="text-align:center;margin-bottom:12px;">'
-  h += '<div class="sub" style="font-size:var(--text-small);color:var(--text-muted);margin-bottom:4px;">Énergie</div>'
-  h += '<div style="font-size:var(--text-h1);font-weight:700;">' + targets.kcal + ' <span style="font-size:var(--text-small);color:var(--text-muted);">kcal</span></div>'
-  h += '</div>'
-  h += '<div style="display:flex;justify-content:space-around;align-items:center;gap:8px;">'
-  h += '<div style="text-align:center;flex:1;"><div class="sub" style="font-size:var(--text-small);color:var(--text-muted);margin-bottom:4px;">Protéines</div><div style="font-size:var(--text-h3);font-weight:700;color:var(--protein);">' + targets.protein + 'g</div></div>'
-  h += '<div style="text-align:center;flex:1;"><div class="sub" style="font-size:var(--text-small);color:var(--text-muted);margin-bottom:4px;">Glucides</div><div style="font-size:var(--text-h3);font-weight:700;color:var(--carbs);">' + targets.carbs + 'g</div></div>'
-  h += '<div style="text-align:center;flex:1;"><div class="sub" style="font-size:var(--text-small);color:var(--text-muted);margin-bottom:4px;">Lipides</div><div style="font-size:var(--text-h3);font-weight:700;color:var(--fat);">' + targets.fat + 'g</div></div>'
-  h += '</div>'
-  h += '</div>'
-  h += '<div class="sub" style="font-size:var(--text-small);text-align:center;color:var(--text-muted);">' + (p.use_custom ? '🔧 Mode manuel' : '📊 Calculé automatiquement') + '</div>'
+  h += '<div class="card">'
+  h += '<button class="list-item" style="width:100%;background:none;border:none;text-align:left;cursor:pointer;color:var(--text);" data-action="open-objectives">'
+  h += '<div><div style="font-size:var(--text-h3);font-weight:600;">Objectifs</div>'
+  h += '<div style="font-size:var(--text-body);color:var(--text-muted);margin-top:4px;"><span style="color:var(--text);font-weight:600;">' + targets.kcal + '</span> kcal / jour</div></div>'
+  h += '<span style="color:var(--text-muted);font-size:var(--text-body);">›</span>'
+  h += '</button>'
   h += '</div>'
 
   // === PARAMÈTRES ===
@@ -940,6 +933,7 @@ function renderModal() {
   else if (m.type === 'date-picker') body = datePickerForm()
   else if (m.type === 'settings') body = settingsForm()
   else if (m.type === 'ing-filter') body = ingFilterForm()
+  else if (m.type === 'objectives') body = objectivesModal()
   else if (m.type === 'recipe-detail') body = recipeDetailModal(m.recipeId)
   else if (m.type === 'recipe-filter') body = recipeFilterForm()
   else if (m.type === 'recipe-ing-picker') body = recipeIngPickerModal()
@@ -1226,7 +1220,53 @@ function editProfileForm() {
     h += '<option value="' + o[0] + '" ' + (p.activity == o[0] ? 'selected' : '') + '>' + o[1] + '</option>'
   })
   h += '</select></label>'
-  h += '<label class="field"><span class="lbl">Objectif</span><div class="segmented" id="p-goal">'
+  h += '<button class="btn primary block" data-action="save-profile" style="margin-top:12px;">Enregistrer</button>'
+
+  return h
+}
+
+function objectiveSummaryHtml() {
+  const p = state.profile
+  const t = computeTargets(p)
+  const share = (g, kcalPerG) => (t.kcal > 0 ? Math.round((g * kcalPerG * 100) / t.kcal) : 0)
+  const activityLabels = { 1.2: 'Sédentaire', 1.375: 'Légère', 1.55: 'Modérée', 1.725: 'Active', 1.9: 'Très active' }
+
+  let h = '<div style="text-align:center;margin-bottom:14px;">'
+  h += '<div style="font-size:var(--text-h1);font-weight:700;">' + t.kcal + ' <span style="font-size:var(--text-small);color:var(--text-muted);font-weight:500;">kcal / jour</span></div>'
+  h += '</div>'
+  h += '<div style="display:flex;justify-content:space-around;align-items:flex-start;gap:8px;">'
+  ;[
+    ['Protéines', t.protein, 4, 'var(--protein)'],
+    ['Glucides', t.carbs, 4, 'var(--carbs)'],
+    ['Lipides', t.fat, 9, 'var(--fat)']
+  ].forEach(m => {
+    h += '<div style="text-align:center;flex:1;"><div style="font-size:var(--text-small);color:var(--text-muted);margin-bottom:4px;">' + m[0] + '</div>'
+    h += '<div style="font-size:var(--text-h3);font-weight:700;color:' + m[3] + ';">' + m[1] + 'g</div>'
+    h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + share(m[1], m[2]) + ' % des kcal</div></div>'
+  })
+  h += '</div>'
+  h += '<div style="font-size:var(--text-small);color:var(--text-muted);text-align:center;margin-top:14px;">'
+  if (p.use_custom) {
+    h += '🔧 Définis manuellement'
+  } else {
+    h += '📊 Calculés automatiquement<br>' + p.weight + ' kg · ' + p.height + ' cm · ' + (calculateAge(p.birthdate) ?? p.age) + ' ans · activité ' + (activityLabels[p.activity] || '—').toLowerCase()
+  }
+  h += '</div>'
+  return h
+}
+
+function refreshObjectiveSummary() {
+  const el = document.getElementById('obj-summary')
+  if (el) el.innerHTML = objectiveSummaryHtml()
+}
+
+function objectivesModal() {
+  const p = state.profile
+
+  let h = '<h2>Objectifs</h2>'
+  h += '<div class="card" id="obj-summary" style="background:var(--surface-raised);margin-bottom:20px;">' + objectiveSummaryHtml() + '</div>'
+
+  h += '<span class="lbl" style="display:block;margin-bottom:6px;">Objectif</span><div class="segmented" id="p-goal" style="margin-bottom:20px;">'
   ;[
     ['cut', 'Sèche'],
     ['maintain', 'Maintien'],
@@ -1234,9 +1274,10 @@ function editProfileForm() {
   ].forEach(o => {
     h += '<button type="button" class="' + (p.goal === o[0] ? 'active' : '') + '" data-goal="' + o[0] + '">' + o[1] + '</button>'
   })
-  h += '</div></label>'
+  h += '</div>'
 
-  h += '<h3 style="margin-top:16px;margin-bottom:8px;">Objectifs</h3>'
+
+  h += '<span class="lbl" style="display:block;margin-bottom:8px;">Manière de calculer</span>'
   h += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><input type="radio" id="p-auto" name="macro-mode" value="auto" style="width:auto;" ' + (!p.use_custom ? 'checked' : '') + '/> <span>Calculés automatiquement</span></label>'
   h += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><input type="radio" id="p-custom" name="macro-mode" value="custom" style="width:auto;" ' + (p.use_custom ? 'checked' : '') + '/> <span>Définis manuellement</span></label>'
 
@@ -1265,7 +1306,8 @@ function editProfileForm() {
   }
   h += '</div>'
 
-  h += '<button class="btn primary block" data-action="save-profile" style="margin-top:12px;">Enregistrer</button>'
+
+  h += '<button class="btn primary block" data-action="close-modal" style="margin-top:12px;">Terminé</button>'
 
   return h
 }
@@ -1562,11 +1604,13 @@ function bindEvents() {
       state.profile.use_custom = false
       customMacrosDiv.style.display = 'none'
       saveProfile(state.profile)
+      refreshObjectiveSummary()
     })
     customRadio.addEventListener('change', () => {
       state.profile.use_custom = true
       customMacrosDiv.style.display = 'block'
       saveProfile(state.profile)
+      refreshObjectiveSummary()
     })
   }
 
@@ -1771,6 +1815,7 @@ function bindCustomMacroInputs() {
           (totalPct !== 100 ? ' <span style="color:var(--danger);">(total ' + round(totalPct) + '%)</span>' : '')
       }
       saveProfile(state.profile)
+      refreshObjectiveSummary()
     }
 
     ;[kcalEl, pctProteinEl, pctCarbsEl, pctFatEl].forEach(el => el.addEventListener('input', recompute))
@@ -1794,6 +1839,7 @@ function bindCustomMacroInputs() {
 
       if (kcalDisplay) kcalDisplay.textContent = round(kcal)
       saveProfile(state.profile)
+      refreshObjectiveSummary()
     }
 
     ;[proteinEl, carbsEl, fatEl].forEach(el => el.addEventListener('input', recompute))
@@ -1911,6 +1957,9 @@ function handleAction(action, el) {
   } else if (action === 'close-profile') {
     state.tab = 'today'
     state.modal = null
+    render()
+  } else if (action === 'open-objectives') {
+    state.modal = { type: 'objectives' }
     render()
   } else if (action === 'open-profile') {
     state.tab = 'profile'
