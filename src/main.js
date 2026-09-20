@@ -1498,17 +1498,7 @@ function recipeIngPickerModal() {
 }
 
 function getIngredientPortions(ing) {
-  if (ing.portions && ing.portions.length > 0) return ing.portions
-
-  // Repli pour les ingrédients pas encore migrés vers le champ unifié "portions"
-  const list = []
-  if (ing.serving_size_grams) {
-    list.push({ name: ing.serving_size || '1 portion', grams: ing.serving_size_grams })
-  }
-  ;(ing.extra_portions || []).forEach(p => {
-    if (p && p.grams) list.push({ name: p.name || '1 portion', grams: p.grams })
-  })
-  return list
+  return ing.portions || []
 }
 
 function renderIngredientPage() {
