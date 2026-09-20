@@ -137,6 +137,8 @@ const state = {
   _draftRecipe: null,
   profilePage: null, // sous-page du profil : 'settings' | 'objectives' (null = profil)
   _profileScrollY: 0,
+  viewIngId: null, // ingrédient affiché en pleine page (null = liste)
+  _ingScrollY: 0,
   viewRecipeId: null, // recette affichée en pleine page (null = liste)
   _recipesScrollY: 0,
   _recipeDetailServings: null, // nombre de parts affiché dans le détail (null = celui de la recette)
@@ -217,13 +219,15 @@ function render() {
 
   let html = ''
   if (state.viewRecipeId && !state.recipes.some(r => r.id === state.viewRecipeId)) state.viewRecipeId = null
+  if (state.viewIngId && !state.ingredients.some(i => i.id === state.viewIngId)) state.viewIngId = null
   if (state.viewRecipeId) html = renderRecipePage()
+  else if (state.viewIngId) html = renderIngredientPage()
   else if (state.tab === 'today') html = renderToday()
   else if (state.tab === 'ingredients') html = renderIngredients()
   else if (state.tab === 'recipes') html = renderRecipes()
   else if (state.tab === 'profile') html = state.profilePage ? renderProfileSubPage() : renderProfile()
 
-  if (state.tab !== 'profile' && !state.viewRecipeId) html += renderTabs()
+  if (state.tab !== 'profile' && !state.viewRecipeId && !state.viewIngId) html += renderTabs()
   if (state.modal) html += renderModal()
   if (state.toastMsg) html += `<div class="toast">${esc(state.toastMsg)}</div>`
 
@@ -590,7 +594,7 @@ function recipeRowHtml(r, isLast) {
   h += '</div>'
   h += '<div style="flex:1;min-width:0;">'
   h += '<div class="name" style="font-size:var(--text-h3);font-weight:600;">' + esc(r.name) + '</div>'
-  h += '<div class="sub">' + r.servings + ' part. · ' + round(m.kcal) + ' kcal/part</div>'
+  h += '<div class="sub">' + r.servings + ' part · ' + round(m.kcal) + ' kcal/part</div>'
   h += '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;"><span class="pill protein">P ' + round(m.protein) + 'g</span><span class="pill carbs">G ' + round(m.carbs) + 'g</span><span class="pill fat">L ' + round(m.fat) + 'g</span></div>'
   h += '</div>'
   h += '<button data-action="toggle-recipe-favorite" data-id="' + r.id + '" title="Favori" style="flex-shrink:0;width:30px;height:40px;background:none;border:none;cursor:pointer;font-size:24px;line-height:1;padding:0;color:' + (r.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (r.is_favorite ? '★' : '☆') + '</button>'
@@ -856,7 +860,7 @@ function recipeDetailBody(recipeId) {
     h += '<div style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Ingrédients</div>'
     h += '<div style="display:flex;align-items:center;gap:10px;">'
     h += '<button data-action="recipe-servings-step" data-delta="-1" style="' + stepBtn + '">−</button>'
-    h += '<span style="font-size:var(--text-body);font-weight:600;min-width:68px;text-align:center;">' + viewServings + ' part.</span>'
+    h += '<span style="font-size:var(--text-body);font-weight:600;min-width:68px;text-align:center;">' + viewServings + ' part</span>'
     h += '<button data-action="recipe-servings-step" data-delta="1" style="' + stepBtn + '">+</button>'
     h += '</div></div>'
     r.items.forEach((it, idx) => {
@@ -1033,7 +1037,6 @@ function renderModal() {
   if (m.type === 'add-ing') body = ingredientForm(m.editId)
   else if (m.type === 'add-recipe') body = recipeForm(m.editId)
   else if (m.type === 'add-log') body = addLogForm()
-  else if (m.type === 'ing-detail') body = ingredientDetailModal(m.ingId)
   else if (m.type === 'edit-profile') body = editProfileForm()
   else if (m.type === 'edit-category') body = editCategoryForm(m.categoryIdx)
   else if (m.type === 'date-picker') body = datePickerForm()
@@ -1508,7 +1511,17 @@ function getIngredientPortions(ing) {
   return list
 }
 
-function ingredientDetailModal(ingId) {
+function renderIngredientPage() {
+  let h = '<header class="top" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+  h += '<button data-action="close-ing-page" title="Retour aux ingrédients" style="width:40px;height:40px;flex-shrink:0;padding:0;border-radius:50%;background:var(--surface-raised);color:var(--text);border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;cursor:pointer;"><span class="header-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></span></button>'
+  h += '<h1 style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;text-align:center;flex:1;">Ingrédient</h1>'
+  h += '<div style="width:40px;flex-shrink:0;"></div>'
+  h += '</header>'
+  h += '<section style="padding-bottom:32px;">' + ingredientDetailBody(state.viewIngId) + '</section>'
+  return h
+}
+
+function ingredientDetailBody(ingId) {
   const ing = state.ingredients.find(i => i.id === ingId)
   if (!ing) return ''
 
@@ -2159,9 +2172,17 @@ function handleAction(action, el) {
     render()
   } else if (action === 'view-ing') {
     state.ingViewMenuOpen = false
+    state._ingScrollY = window.scrollY
     state._ingDetailPortionIdx = null
-    state.modal = { type: 'ing-detail', ingId: el.getAttribute('data-id') }
+    state.viewIngId = el.getAttribute('data-id')
+    state.modal = null
     render()
+    window.scrollTo(0, 0)
+  } else if (action === 'close-ing-page') {
+    state.viewIngId = null
+    state.modal = null
+    render()
+    window.scrollTo(0, state._ingScrollY)
   } else if (action === 'set-ing-detail-portion') {
     const idx = parseInt(el.getAttribute('data-idx'))
     state._ingDetailPortionIdx = idx === -1 ? null : idx
@@ -2179,7 +2200,9 @@ function handleAction(action, el) {
     state.ingredients = state.ingredients.filter(i => i.id !== id)
     deleteIngredient(id)
     state.modal = null
+    state.viewIngId = null
     render()
+    window.scrollTo(0, state._ingScrollY)
   } else if (action === 'add-brand') {
     if (!state._draftIngredient) state._draftIngredient = {}
     const input = document.getElementById('f-brand-input')
