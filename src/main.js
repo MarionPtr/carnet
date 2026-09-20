@@ -131,6 +131,8 @@ const state = {
   _ingDetailPortionIdx: null,
   _draftIngredient: null,
   _draftRecipe: null,
+  viewRecipeId: null, // recette affichée en pleine page (null = liste)
+  _recipesScrollY: 0,
   _recipeDetailServings: null, // nombre de parts affiché dans le détail (null = celui de la recette)
   _recipeIngPickerIdx: null,
   _recipeIngPickerSearch: '',
@@ -208,12 +210,14 @@ function render() {
   }
 
   let html = ''
-  if (state.tab === 'today') html = renderToday()
+  if (state.viewRecipeId && !state.recipes.some(r => r.id === state.viewRecipeId)) state.viewRecipeId = null
+  if (state.viewRecipeId) html = renderRecipePage()
+  else if (state.tab === 'today') html = renderToday()
   else if (state.tab === 'ingredients') html = renderIngredients()
   else if (state.tab === 'recipes') html = renderRecipes()
   else if (state.tab === 'profile') html = renderProfile()
 
-  if (state.tab !== 'profile') html += renderTabs()
+  if (state.tab !== 'profile' && !state.viewRecipeId) html += renderTabs()
   if (state.modal) html += renderModal()
   if (state.toastMsg) html += `<div class="toast">${esc(state.toastMsg)}</div>`
 
@@ -708,7 +712,17 @@ function recipeFilterForm() {
   return h
 }
 
-function recipeDetailModal(recipeId) {
+function renderRecipePage() {
+  let h = '<header class="top" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+  h += '<button data-action="close-recipe-page" title="Retour aux recettes" style="width:40px;height:40px;flex-shrink:0;padding:0;border-radius:50%;background:var(--surface-raised);color:var(--text);border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;cursor:pointer;"><span class="header-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></span></button>'
+  h += '<h1 style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;text-align:center;flex:1;">Recette</h1>'
+  h += '<div style="width:40px;flex-shrink:0;"></div>'
+  h += '</header>'
+  h += '<section style="padding-bottom:32px;">' + recipeDetailBody(state.viewRecipeId) + '</section>'
+  return h
+}
+
+function recipeDetailBody(recipeId) {
   const r = state.recipes.find(x => x.id === recipeId)
   if (!r) return ''
   const m = recipeMacrosPerServing(r, state.ingredients)
@@ -935,7 +949,6 @@ function renderModal() {
   else if (m.type === 'settings') body = settingsForm()
   else if (m.type === 'ing-filter') body = ingFilterForm()
   else if (m.type === 'objectives') body = objectivesModal()
-  else if (m.type === 'recipe-detail') body = recipeDetailModal(m.recipeId)
   else if (m.type === 'recipe-filter') body = recipeFilterForm()
   else if (m.type === 'recipe-ing-picker') body = recipeIngPickerModal()
   else if (m.type === 'edit-recipe-type') body = editRecipeTypeForm(m.typeIdx)
@@ -1930,11 +1943,19 @@ function handleAction(action, el) {
     }
     render()
   } else if (action === 'view-recipe') {
+    state._recipesScrollY = window.scrollY
     state._recipeDetailServings = null
-    state.modal = { type: 'recipe-detail', recipeId: el.getAttribute('data-id') }
+    state.viewRecipeId = el.getAttribute('data-id')
+    state.modal = null
     render()
+    window.scrollTo(0, 0)
+  } else if (action === 'close-recipe-page') {
+    state.viewRecipeId = null
+    state.modal = null
+    render()
+    window.scrollTo(0, state._recipesScrollY)
   } else if (action === 'recipe-servings-step') {
-    const recipe = state.recipes.find(r => r.id === state.modal.recipeId)
+    const recipe = state.recipes.find(r => r.id === state.viewRecipeId)
     if (recipe) {
       const current = state._recipeDetailServings || Math.max(1, recipe.servings || 1)
       state._recipeDetailServings = Math.max(1, current + parseInt(el.getAttribute('data-delta')))
@@ -2144,7 +2165,9 @@ function handleAction(action, el) {
     state.recipes = state.recipes.filter(r => r.id !== rid)
     deleteRecipe(rid)
     state.modal = null
+    state.viewRecipeId = null
     render()
+    window.scrollTo(0, state._recipesScrollY)
   } else if (action === 'rf-servings-step') {
     if (!state._draftRecipe) return
     const current = Math.max(1, parseInt(state._draftRecipe.servings) || 1)
