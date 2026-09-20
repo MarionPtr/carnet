@@ -486,6 +486,12 @@ function ingFamilySectionHtml(group, grouped) {
   return h
 }
 
+// Marque(s) du produit, en petit et en gris sous le nom (vide s'il n'y en a pas)
+function ingBrandHtml(i, marginTop) {
+  if (!i.brands || i.brands.length === 0) return ''
+  return '<div style="color:var(--text-muted);font-size:var(--text-small);font-weight:400;line-height:1.3;margin-top:' + (marginTop || '2px') + ';">' + esc(i.brands.join(', ')) + '</div>'
+}
+
 function ingThumbHtml(i, size, emojiSize) {
   return i.photo
     ? '<img src="' + esc(i.photo) + '" style="width:100%;height:' + size + ';object-fit:cover;display:block;"/>'
@@ -497,7 +503,7 @@ function ingRowHtml(i, isLast) {
   h += '<div style="width:56px;height:56px;flex-shrink:0;border-radius:10px;overflow:hidden;margin-right:12px;background:var(--surface-raised);border:1px solid var(--border);">'
   h += ingThumbHtml(i, '100%', 'var(--text-h2)')
   h += '</div>'
-  h += '<div style="flex:1;"><div class="name" style="font-size:var(--text-h3);font-weight:600;">' + (i.is_favorite ? '⭐ ' : '') + esc(i.name) + '</div></div>'
+  h += '<div style="flex:1;min-width:0;"><div class="name" style="font-size:var(--text-h3);font-weight:600;">' + (i.is_favorite ? '⭐ ' : '') + esc(i.name) + '</div>' + ingBrandHtml(i) + '</div>'
   h += '<div style="color:var(--text-muted);font-size:28px;line-height:1;flex-shrink:0;padding-left:6px;">›</div>'
   h += '</div>'
   return h
@@ -510,6 +516,7 @@ function ingCardHtml(i) {
   h += '</div>'
   h += '<div style="padding:10px 12px 12px;">'
   h += '<div style="font-size:var(--text-body);font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + (i.is_favorite ? '⭐ ' : '') + esc(i.name) + '</div>'
+  h += ingBrandHtml(i)
   h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + round(i.kcal) + ' kcal / 100 ' + esc(i.unit || 'g') + '</div>'
   h += '</div></div>'
   return h
@@ -1585,7 +1592,7 @@ function recipeIngPickerModal() {
 
   const ingRow = (i, isLast) => {
     let row = '<div class="list-item" style="cursor:pointer;padding:10px 12px;border-bottom:' + (isLast ? 'none' : '1px solid var(--border)') + ';" data-action="pick-recipe-ingredient" data-id="' + i.id + '">'
-    row += '<div style="flex:1;">' + (i.is_favorite ? '⭐ ' : '') + esc(i.name) + '</div>'
+    row += '<div style="flex:1;min-width:0;"><div>' + (i.is_favorite ? '⭐ ' : '') + esc(i.name) + '</div>' + ingBrandHtml(i) + '</div>'
     row += '</div>'
     return row
   }
