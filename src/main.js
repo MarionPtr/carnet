@@ -123,6 +123,7 @@ const state = {
   recipeSearch: '',
   recipeViewMode: savedPrefs.recipeViewMode || 'category', // 'category' ou 'alphabetical'
   recipeLayout: savedPrefs.recipeLayout || 'list', // 'list' ou 'cards'
+  recipeViewMenuOpen: false,
   recipeVisibleTypes: savedPrefs.recipeVisibleTypes || null, // null = tous visibles, sinon tableau de types cochés
   recipeFavoritesOnly: !!savedPrefs.recipeFavoritesOnly,
   collapsedRecipeTypes: savedPrefs.collapsedRecipeTypes || {},
@@ -635,6 +636,40 @@ function recipeGroupHtml(list) {
   return h + '</div>'
 }
 
+function recipeViewMenuHtml() {
+  const checkSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12 10 18 20 6"/></svg>'
+  const icons = {
+    grid: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg>',
+    list: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01M8 6h13M8 12h13M8 18h13"/></svg>'
+  }
+  const item = (label, checked, attrs, icon, hasIcons) => {
+    let row = '<button type="button" ' + attrs + ' style="display:flex;align-items:center;width:100%;background:none;border:none;color:var(--text);text-align:left;cursor:pointer;padding:0 18px 0 12px;height:48px;font-size:var(--text-h3);">'
+    row += '<span style="width:28px;flex-shrink:0;display:flex;align-items:center;">' + (checked ? checkSvg : '') + '</span>'
+    if (hasIcons) row += '<span style="width:22px;height:22px;flex-shrink:0;margin-right:12px;display:flex;color:var(--text);">' + (icon ? icons[icon] : '') + '</span>'
+    row += '<span>' + label + '</span></button>'
+    return row
+  }
+  const sep = '<div style="height:1px;background:var(--border-strong);margin:4px 14px;"></div>'
+  const mode = state.recipeViewMode
+  const keys = recipeGroupKeys()
+  const allExpanded = keys.length > 0 && keys.every(t => state.collapsedRecipeTypes[t] === false)
+
+  let h = '<div style="position:fixed;inset:0;z-index:25;" data-action="close-recipe-view-menu"></div>'
+  h += '<div style="position:absolute;top:52px;right:0;z-index:30;min-width:260px;padding:6px 0;background:var(--surface-raised);border:1px solid var(--border-strong);border-radius:16px;box-shadow:0 12px 32px rgba(0,0,0,0.45);">'
+  h += item('Par type', mode === 'category', 'data-action="set-recipe-view-mode" data-mode="category"')
+  h += item('Liste alphabétique', mode === 'alphabetical', 'data-action="set-recipe-view-mode" data-mode="alphabetical"')
+  h += sep
+  h += item('Cartes', state.recipeLayout === 'cards', 'data-action="set-recipe-layout" data-layout="cards"', 'grid', true)
+  h += item('Liste', state.recipeLayout !== 'cards', 'data-action="set-recipe-layout" data-layout="list"', 'list', true)
+  if (mode === 'category') {
+    h += sep
+    h += item('Sections repliées', !allExpanded, 'data-action="set-recipe-collapse-all" data-collapsed="true"')
+    h += item('Sections dépliées', allExpanded, 'data-action="set-recipe-collapse-all" data-collapsed="false"')
+  }
+  h += '</div>'
+  return h
+}
+
 function renderRecipes() {
   const q = state.recipeSearch.toLowerCase()
   const filtered = state.recipes.filter(r => r.name.toLowerCase().indexOf(q) > -1 && (!state.recipeFavoritesOnly || r.is_favorite))
@@ -656,8 +691,9 @@ function renderRecipes() {
   h += '</header>'
   h += '<section>'
 
-  const isFilterActive = state.recipeViewMode === 'alphabetical' || state.recipeVisibleTypes !== null || state.recipeFavoritesOnly
-  h += '<div style="display:flex;gap:8px;">'
+  const isFilterActive = state.recipeVisibleTypes !== null || state.recipeFavoritesOnly
+  const isViewCustom = state.recipeViewMode === 'alphabetical' || state.recipeLayout === 'cards'
+  h += '<div style="display:flex;gap:8px;position:relative;">'
   h += '<div class="search-wrap" style="position:relative;flex:1;margin-bottom:0;">'
   h += '<input placeholder="Rechercher…" id="recipe-search" value="' + esc(state.recipeSearch) + '" style="' + (state.recipeSearch ? 'padding-right:36px;' : '') + '"/>'
   if (state.recipeSearch) {
@@ -670,6 +706,13 @@ function renderRecipes() {
     h += '<span style="position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--protein);"></span>'
   }
   h += '</button>'
+  h += '<button data-action="toggle-recipe-view-menu" title="Affichage" style="position:relative;flex-shrink:0;width:44px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:var(--surface-raised);color:var(--text);border:1px solid var(--border-strong);cursor:pointer;">'
+  h += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg>'
+  if (isViewCustom) {
+    h += '<span style="position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--protein);"></span>'
+  }
+  h += '</button>'
+  if (state.recipeViewMenuOpen) h += recipeViewMenuHtml()
   h += '</div>'
 
   if (state.recipes.length === 0) {
@@ -702,35 +745,14 @@ function renderRecipes() {
 }
 
 function recipeFilterForm() {
-  const mode = state.recipeViewMode
-  let h = '<h2>Affichage</h2>'
-  h += '<div class="segmented" style="margin-bottom:20px;">'
-  h += '<button type="button" class="' + (mode === 'category' ? 'active' : '') + '" data-action="set-recipe-view-mode" data-mode="category">Par type</button>'
-  h += '<button type="button" class="' + (mode === 'alphabetical' ? 'active' : '') + '" data-action="set-recipe-view-mode" data-mode="alphabetical">Liste alphabétique</button>'
-  h += '</div>'
-
-  h += '<span class="lbl" style="display:block;margin-bottom:10px;">Présentation</span>'
-  h += '<div class="segmented" style="margin-bottom:20px;">'
-  h += '<button type="button" class="' + (state.recipeLayout !== 'cards' ? 'active' : '') + '" data-action="set-recipe-layout" data-layout="list">Liste</button>'
-  h += '<button type="button" class="' + (state.recipeLayout === 'cards' ? 'active' : '') + '" data-action="set-recipe-layout" data-layout="cards">Cartes</button>'
-  h += '</div>'
-
-  if (mode === 'category') {
-    const keys = recipeGroupKeys()
-    const allExpanded = keys.length > 0 && keys.every(t => state.collapsedRecipeTypes[t] === false)
-    h += '<span class="lbl" style="display:block;margin-bottom:10px;">Sections</span>'
-    h += '<div class="segmented" style="margin-bottom:20px;">'
-    h += '<button type="button" class="' + (!allExpanded ? 'active' : '') + '" data-action="set-recipe-collapse-all" data-collapsed="true">Repliées</button>'
-    h += '<button type="button" class="' + (allExpanded ? 'active' : '') + '" data-action="set-recipe-collapse-all" data-collapsed="false">Dépliées</button>'
-    h += '</div>'
-  }
+  let h = '<h2>Filtres</h2>'
 
   h += '<label class="list-item" style="cursor:pointer;margin-bottom:20px;">'
   h += '<span>⭐ Favoris uniquement</span>'
   h += '<input type="checkbox" data-action="toggle-recipe-fav-filter" style="width:auto;" ' + (state.recipeFavoritesOnly ? 'checked' : '') + '/>'
   h += '</label>'
 
-  if (mode === 'category') {
+  if (state.recipeViewMode === 'category') {
     h += '<span class="lbl" style="display:block;margin-bottom:10px;">Types visibles</span>'
     recipeTypeOptions().forEach(type => {
       const checked = state.recipeVisibleTypes === null || state.recipeVisibleTypes.includes(type)
@@ -1563,6 +1585,7 @@ function bindEvents() {
   app.querySelectorAll('[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => {
       state.tab = btn.getAttribute('data-tab')
+      state.recipeViewMenuOpen = false
       state.modal = null
       render()
     })
@@ -1951,20 +1974,30 @@ function handleAction(action, el) {
     const currentlyCollapsed = state.collapsedRecipeTypes[type] !== false
     state.collapsedRecipeTypes[type] = !currentlyCollapsed
     render()
+  } else if (action === 'toggle-recipe-view-menu') {
+    state.recipeViewMenuOpen = !state.recipeViewMenuOpen
+    render()
+  } else if (action === 'close-recipe-view-menu') {
+    state.recipeViewMenuOpen = false
+    render()
   } else if (action === 'set-recipe-collapse-all') {
     const collapsed = el.getAttribute('data-collapsed') === 'true'
     recipeGroupKeys().forEach(t => {
       state.collapsedRecipeTypes[t] = collapsed
     })
+    state.recipeViewMenuOpen = false
     render()
   } else if (action === 'open-recipe-filter') {
+    state.recipeViewMenuOpen = false
     state.modal = { type: 'recipe-filter' }
     render()
   } else if (action === 'set-recipe-layout') {
     state.recipeLayout = el.getAttribute('data-layout')
+    state.recipeViewMenuOpen = false
     render()
   } else if (action === 'set-recipe-view-mode') {
     state.recipeViewMode = el.getAttribute('data-mode')
+    state.recipeViewMenuOpen = false
     render()
   } else if (action === 'toggle-recipe-fav-filter') {
     state.recipeFavoritesOnly = el.checked
@@ -1984,6 +2017,7 @@ function handleAction(action, el) {
     }
     render()
   } else if (action === 'view-recipe') {
+    state.recipeViewMenuOpen = false
     state._recipesScrollY = window.scrollY
     state._recipeDetailServings = null
     state.viewRecipeId = el.getAttribute('data-id')
