@@ -514,6 +514,15 @@ function recipeTypeOptions() {
   return options
 }
 
+function recipeGroupKeys() {
+  const keys = recipeTypeOptions()
+  state.recipes.forEach(r => {
+    const key = r.type || 'Sans type'
+    if (!keys.includes(key)) keys.push(key)
+  })
+  return keys
+}
+
 function recipeRowHtml(r, isLast) {
   const m = recipeMacrosPerServing(r, state.ingredients)
   let h = '<div class="list-item" style="cursor:pointer;padding:12px;align-items:center;border-bottom:' + (isLast ? 'none' : '1px solid var(--border)') + ';" data-action="view-recipe" data-id="' + r.id + '">'
@@ -618,6 +627,16 @@ function recipeFilterForm() {
   h += '<button type="button" class="' + (mode === 'category' ? 'active' : '') + '" data-action="set-recipe-view-mode" data-mode="category">Par type</button>'
   h += '<button type="button" class="' + (mode === 'alphabetical' ? 'active' : '') + '" data-action="set-recipe-view-mode" data-mode="alphabetical">Liste alphabétique</button>'
   h += '</div>'
+
+  if (mode === 'category') {
+    const keys = recipeGroupKeys()
+    const allExpanded = keys.length > 0 && keys.every(t => state.collapsedRecipeTypes[t] === false)
+    h += '<span class="lbl" style="display:block;margin-bottom:10px;">Sections</span>'
+    h += '<div class="segmented" style="margin-bottom:20px;">'
+    h += '<button type="button" class="' + (!allExpanded ? 'active' : '') + '" data-action="set-recipe-collapse-all" data-collapsed="true">Repliées</button>'
+    h += '<button type="button" class="' + (allExpanded ? 'active' : '') + '" data-action="set-recipe-collapse-all" data-collapsed="false">Dépliées</button>'
+    h += '</div>'
+  }
 
   h += '<label class="list-item" style="cursor:pointer;margin-bottom:20px;">'
   h += '<span>⭐ Favoris uniquement</span>'
@@ -1738,6 +1757,12 @@ function handleAction(action, el) {
     const type = el.getAttribute('data-type')
     const currentlyCollapsed = state.collapsedRecipeTypes[type] !== false
     state.collapsedRecipeTypes[type] = !currentlyCollapsed
+    render()
+  } else if (action === 'set-recipe-collapse-all') {
+    const collapsed = el.getAttribute('data-collapsed') === 'true'
+    recipeGroupKeys().forEach(t => {
+      state.collapsedRecipeTypes[t] = collapsed
+    })
     render()
   } else if (action === 'open-recipe-filter') {
     state.modal = { type: 'recipe-filter' }
