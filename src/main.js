@@ -1527,12 +1527,12 @@ function ingredientDetailBody(ingId) {
 
   let h = ''
 
-  // Photo (carré arrondi très petit, centré)
-  h += '<div style="width:80px;aspect-ratio:1;border-radius:10px;overflow:hidden;margin:0 auto 16px;background:var(--surface-raised);border:1px solid var(--border);">'
+  // Photo pleine largeur (comme le détail d'une recette)
+  h += '<div style="width:100%;aspect-ratio:16/10;border-radius:14px;overflow:hidden;margin:0 0 16px;background:var(--surface-raised);border:1px solid var(--border);">'
   if (ing.photo) {
     h += '<img src="' + ing.photo + '" style="width:100%;height:100%;object-fit:cover;"/>'
   } else {
-    h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h1);">🥘</div>'
+    h += '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:56px;">🥘</div>'
   }
   h += '</div>'
 
