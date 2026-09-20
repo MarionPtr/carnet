@@ -512,6 +512,15 @@ function renderIngredients() {
   return h
 }
 
+function ingGroupKeys() {
+  const keys = state.categories.slice()
+  state.ingredients.forEach(i => {
+    const key = i.category || 'Sans catégorie'
+    if (!keys.includes(key)) keys.push(key)
+  })
+  return keys
+}
+
 function ingFilterForm() {
   const mode = state.ingViewMode
   let h = '<h2>Affichage</h2>'
@@ -519,6 +528,16 @@ function ingFilterForm() {
   h += '<button type="button" class="' + (mode === 'category' ? 'active' : '') + '" data-action="set-ing-view-mode" data-mode="category">Par catégorie</button>'
   h += '<button type="button" class="' + (mode === 'alphabetical' ? 'active' : '') + '" data-action="set-ing-view-mode" data-mode="alphabetical">Liste alphabétique</button>'
   h += '</div>'
+
+  if (mode === 'category') {
+    const keys = ingGroupKeys()
+    const allExpanded = keys.length > 0 && keys.every(c => state.collapsedCategories[c] === false)
+    h += '<span class="lbl" style="display:block;margin-bottom:10px;">Sections</span>'
+    h += '<div class="segmented" style="margin-bottom:20px;">'
+    h += '<button type="button" class="' + (!allExpanded ? 'active' : '') + '" data-action="set-ing-collapse-all" data-collapsed="true">Repliées</button>'
+    h += '<button type="button" class="' + (allExpanded ? 'active' : '') + '" data-action="set-ing-collapse-all" data-collapsed="false">Dépliées</button>'
+    h += '</div>'
+  }
 
   h += '<label class="list-item" style="cursor:pointer;margin-bottom:20px;">'
   h += '<span>⭐ Favoris uniquement</span>'
@@ -1778,6 +1797,12 @@ function handleAction(action, el) {
     const cat = el.getAttribute('data-cat')
     const currentlyCollapsed = state.collapsedCategories[cat] !== false
     state.collapsedCategories[cat] = !currentlyCollapsed
+    render()
+  } else if (action === 'set-ing-collapse-all') {
+    const collapsed = el.getAttribute('data-collapsed') === 'true'
+    ingGroupKeys().forEach(c => {
+      state.collapsedCategories[c] = collapsed
+    })
     render()
   } else if (action === 'open-ing-filter') {
     state.modal = { type: 'ing-filter' }
