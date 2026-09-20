@@ -587,18 +587,19 @@ function recipeGroupKeys() {
 
 function recipeRowHtml(r, isLast) {
   const m = recipeMacrosPerServing(r, state.ingredients)
-  let h = '<div class="list-item" style="cursor:pointer;padding:12px;align-items:center;border-bottom:' + (isLast ? 'none' : '1px solid var(--border)') + ';" data-action="view-recipe" data-id="' + r.id + '">'
-  h += '<div style="width:88px;height:88px;flex-shrink:0;border-radius:12px;overflow:hidden;margin-right:14px;background:var(--surface-raised);border:1px solid var(--border);">'
+  let h = '<div class="list-item" style="cursor:pointer;padding:12px 10px;align-items:center;gap:6px;border-bottom:' + (isLast ? 'none' : '1px solid var(--border)') + ';" data-action="view-recipe" data-id="' + r.id + '">'
+  h += '<div style="width:88px;height:88px;flex-shrink:0;border-radius:12px;overflow:hidden;margin-right:12px;background:var(--surface-raised);border:1px solid var(--border);">'
   h += r.photo
     ? '<img src="' + esc(r.photo) + '" style="width:100%;height:100%;object-fit:cover;"/>'
     : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:34px;">🍽️</div>'
   h += '</div>'
   h += '<div style="flex:1;min-width:0;">'
-  h += '<div class="name" style="font-size:var(--text-h3);font-weight:600;">' + (r.is_favorite ? '⭐ ' : '') + esc(r.name) + '</div>'
+  h += '<div class="name" style="font-size:var(--text-h3);font-weight:600;">' + esc(r.name) + '</div>'
   h += '<div class="sub">' + r.servings + ' part. · ' + round(m.kcal) + ' kcal/part</div>'
   h += '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;"><span class="pill protein">P ' + round(m.protein) + 'g</span><span class="pill carbs">G ' + round(m.carbs) + 'g</span><span class="pill fat">L ' + round(m.fat) + 'g</span></div>'
   h += '</div>'
-  h += '<div style="color:var(--text-muted);font-size:28px;line-height:1;flex-shrink:0;padding-left:6px;">›</div>'
+  h += '<button data-action="toggle-recipe-favorite" data-id="' + r.id + '" title="Favori" style="flex-shrink:0;width:30px;height:40px;background:none;border:none;cursor:pointer;font-size:24px;line-height:1;padding:0;color:' + (r.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (r.is_favorite ? '★' : '☆') + '</button>'
+  h += '<div style="color:var(--text-muted);font-size:28px;line-height:1;flex-shrink:0;padding-left:0;">›</div>'
   h += '</div>'
   return h
 }
@@ -606,13 +607,14 @@ function recipeRowHtml(r, isLast) {
 function recipeCardHtml(r) {
   const m = recipeMacrosPerServing(r, state.ingredients)
   let h = '<div data-action="view-recipe" data-id="' + r.id + '" style="cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;min-width:0;">'
-  h += '<div style="width:100%;aspect-ratio:4/3;background:var(--surface-raised);">'
+  h += '<div style="position:relative;width:100%;aspect-ratio:4/3;background:var(--surface-raised);">'
   h += r.photo
     ? '<img src="' + esc(r.photo) + '" style="width:100%;height:100%;object-fit:cover;display:block;"/>'
     : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:40px;">🍽️</div>'
+  h += '<button data-action="toggle-recipe-favorite" data-id="' + r.id + '" title="Favori" style="position:absolute;top:8px;right:8px;width:34px;height:34px;border-radius:50%;border:none;background:rgba(0,0,0,0.5);cursor:pointer;font-size:20px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;color:' + (r.is_favorite ? 'var(--protein)' : '#fff') + ';">' + (r.is_favorite ? '★' : '☆') + '</button>'
   h += '</div>'
   h += '<div style="padding:10px 12px 12px;">'
-  h += '<div style="font-size:var(--text-body);font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + (r.is_favorite ? '⭐ ' : '') + esc(r.name) + '</div>'
+  h += '<div style="font-size:var(--text-body);font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + esc(r.name) + '</div>'
   h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:4px;">' + round(m.kcal) + ' kcal / portion</div>'
   h += '</div></div>'
   return h
@@ -1600,8 +1602,9 @@ function bindEvents() {
 
   // Actions
   app.querySelectorAll('[data-action]').forEach(el => {
-    el.addEventListener('click', () => {
+    el.addEventListener('click', ev => {
       const action = el.getAttribute('data-action')
+      if (action === 'toggle-recipe-favorite') ev.stopPropagation()
       handleAction(action, el)
       saveDisplayPrefs()
     })
