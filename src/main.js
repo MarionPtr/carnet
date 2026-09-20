@@ -832,7 +832,7 @@ function renderProfile() {
 
   // === PARAMÈTRES ===
   h += '<div class="card" style="padding-top:2px;padding-bottom:2px;">'
-  h += '<button class="list-item" style="width:100%;background:none;border:none;text-align:left;cursor:pointer;color:var(--text);font-size:var(--text-body);" data-action="open-settings"><span><span style="margin-right:10px;">⚙️</span>Paramètres</span><span style="color:var(--text-muted);">›</span></button>'
+  h += '<button class="list-item" style="width:100%;background:none;border:none;text-align:left;cursor:pointer;color:var(--text);font-size:var(--text-body);" data-action="open-settings"><span style="font-weight:600;"><span style="margin-right:10px;">⚙️</span>Paramètres</span><span style="color:var(--text-muted);">›</span></button>'
   h += '</div>'
 
   h += '</section>'
