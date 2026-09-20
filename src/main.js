@@ -100,6 +100,7 @@ const state = {
   _ingDetailPortionIdx: null,
   _draftIngredient: null,
   _draftRecipe: null,
+  _recipeDetailServings: null, // nombre de parts affiché dans le détail (null = celui de la recette)
   _recipeIngPickerIdx: null,
   _recipeIngPickerSearch: '',
   _recipeIngPickerViewMode: 'alphabetical', // 'alphabetical' ou 'category'
@@ -676,10 +677,11 @@ function recipeDetailModal(recipeId) {
   h += '<h2 style="margin:0;">' + esc(r.name) + '</h2>'
   h += '<button data-action="toggle-recipe-favorite" data-id="' + r.id + '" style="background:none;border:none;cursor:pointer;font-size:22px;line-height:1;padding:2px;color:' + (r.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (r.is_favorite ? '★' : '☆') + '</button>'
   h += '</div>'
-  h += '<div style="color:var(--text-muted);font-size:var(--text-small);margin-bottom:12px;font-weight:500;">' + r.servings + ' part.</div>'
 
   if (r.reference_url) {
-    h += '<a href="' + esc(r.reference_url) + '" target="_blank" rel="noopener" style="display:inline-block;color:var(--protein);font-size:var(--text-small);font-weight:600;margin-bottom:16px;text-decoration:none;">🔗 Recette de référence</a>'
+    h += '<a href="' + esc(r.reference_url) + '" target="_blank" rel="noopener" style="display:inline-block;color:var(--protein);font-size:var(--text-small);font-weight:600;margin:6px 0 16px;text-decoration:none;">🔗 Recette de référence</a>'
+  } else {
+    h += '<div style="margin-bottom:12px;"></div>'
   }
 
   h += '<div class="card" style="background:var(--surface-raised);padding:14px;margin-bottom:16px;">'
@@ -696,12 +698,30 @@ function recipeDetailModal(recipeId) {
   h += '</div></div>'
 
   if ((r.items || []).length > 0) {
+    const baseServings = Math.max(1, r.servings || 1)
+    const viewServings = state._recipeDetailServings || baseServings
+    const factor = viewServings / baseServings
+    const stepBtn = 'width:28px;height:28px;padding:0;line-height:1;border-radius:50%;background:var(--surface);color:var(--text);border:1px solid var(--border-strong);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;'
+
     h += '<div class="card" style="background:var(--surface-raised);padding:14px;margin-bottom:16px;">'
-    h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Ingrédients</div>'
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
+    h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Ingrédients</div>'
+    h += '<div style="display:flex;align-items:center;gap:10px;">'
+    h += '<button data-action="recipe-servings-step" data-delta="-1" style="' + stepBtn + '">−</button>'
+    h += '<span style="font-size:var(--text-small);font-weight:600;min-width:52px;text-align:center;">' + viewServings + ' part.</span>'
+    h += '<button data-action="recipe-servings-step" data-delta="1" style="' + stepBtn + '">+</button>'
+    h += '</div></div>'
     r.items.forEach((it, idx) => {
       const ing = state.ingredients.find(i => i.id === it.ingredient_id)
-      h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);padding:6px 0;' + (idx < r.items.length - 1 ? 'border-bottom:1px solid var(--border);' : '') + '"><div>' + (ing ? esc(ing.name) : 'Ingrédient supprimé') + '</div><div style="font-weight:500;">' + round(it.grams) + ' ' + (ing && ing.unit ? esc(ing.unit) : 'g') + '</div></div>'
+      h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);padding:6px 0;' + (idx < r.items.length - 1 ? 'border-bottom:1px solid var(--border);' : '') + '"><div>' + (ing ? esc(ing.name) : 'Ingrédient supprimé') + '</div><div style="font-weight:500;">' + round(it.grams * factor, 1) + ' ' + (ing && ing.unit ? esc(ing.unit) : 'g') + '</div></div>'
     })
+    h += '</div>'
+  }
+
+  if (r.instructions && r.instructions.trim()) {
+    h += '<div class="card" style="background:var(--surface-raised);padding:14px;margin-bottom:16px;">'
+    h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Instructions</div>'
+    h += '<div style="font-size:var(--text-small);line-height:1.5;white-space:pre-wrap;">' + esc(r.instructions) + '</div>'
     h += '</div>'
   }
 
@@ -979,7 +999,7 @@ function recipeForm(editId) {
   if (!state._draftRecipe || state._draftRecipe.__for !== editId) {
     const r = editId
       ? state.recipes.find(x => x.id === editId)
-      : { name: '', servings: 4, type: '', reference_url: '', photo: '', items: [] }
+      : { name: '', servings: 4, type: '', reference_url: '', photo: '', instructions: '', items: [] }
     state._draftRecipe = {
       __for: editId,
       name: r.name,
@@ -987,6 +1007,7 @@ function recipeForm(editId) {
       type: r.type || '',
       reference_url: r.reference_url || '',
       photo: r.photo || '',
+      instructions: r.instructions || '',
       items: (r.items || []).map(i => ({ ingredient_id: i.ingredient_id, grams: i.grams }))
     }
   }
@@ -1049,6 +1070,8 @@ function recipeForm(editId) {
     const s = Math.max(1, parseInt(draft.servings) || 1)
     h += '<div class="card" style="background:var(--surface-raised);margin-bottom:14px;"><div class="sub">Par portion : ' + round(totals.kcal / s) + ' kcal · P ' + round(totals.protein / s) + 'g · G ' + round(totals.carbs / s) + 'g · L ' + round(totals.fat / s) + 'g</div></div>'
   }
+
+  h += '<label class="field"><span class="lbl">Instructions</span><textarea id="rf-instructions" rows="6" placeholder="Étapes de la recette…" style="resize:vertical;">' + esc(draft.instructions) + '</textarea></label>'
 
   h += '<button class="btn primary block" data-action="save-recipe" data-id="' + (editId || '') + '">Enregistrer la recette</button>'
   return h
@@ -1604,6 +1627,13 @@ function bindEvents() {
       state._draftRecipe.reference_url = rfReferenceUrl.value
     })
   }
+  const rfInstructions = document.getElementById('rf-instructions')
+  if (rfInstructions) {
+    rfInstructions.addEventListener('input', () => {
+      if (!state._draftRecipe) return
+      state._draftRecipe.instructions = rfInstructions.value
+    })
+  }
   const rfPhotoUrl = document.getElementById('rf-photo-url')
   if (rfPhotoUrl) {
     rfPhotoUrl.addEventListener('input', () => {
@@ -1785,8 +1815,16 @@ function handleAction(action, el) {
     }
     render()
   } else if (action === 'view-recipe') {
+    state._recipeDetailServings = null
     state.modal = { type: 'recipe-detail', recipeId: el.getAttribute('data-id') }
     render()
+  } else if (action === 'recipe-servings-step') {
+    const recipe = state.recipes.find(r => r.id === state.modal.recipeId)
+    if (recipe) {
+      const current = state._recipeDetailServings || Math.max(1, recipe.servings || 1)
+      state._recipeDetailServings = Math.max(1, current + parseInt(el.getAttribute('data-delta')))
+      render()
+    }
   } else if (action === 'toggle-recipe-favorite') {
     const recipe = state.recipes.find(r => r.id === el.getAttribute('data-id'))
     if (recipe) {
@@ -2039,6 +2077,11 @@ function handleAction(action, el) {
       reference_url: document.getElementById('rf-reference-url').value.trim(),
       photo: document.getElementById('rf-photo-url').value.trim(),
       items: draft.items
+    }
+    const instructions = document.getElementById('rf-instructions').value.trim()
+    const existingRecipe = editId2 ? state.recipes.find(r => r.id === editId2) : null
+    if (instructions || (existingRecipe && 'instructions' in existingRecipe)) {
+      obj2.instructions = instructions
     }
     if (editId2) {
       state.recipes = state.recipes.map(r => (r.id === editId2 ? { ...obj2, is_favorite: r.is_favorite } : r))
