@@ -1355,6 +1355,101 @@ function ingredientForm(editId) {
   return h
 }
 
+// Si la quantité correspond à un nombre entier (ou une demi) de portions, on l'affiche en portions
+function detectPortionIdx(ing, grams) {
+  if (!ing) return null
+  const portions = getIngredientPortions(ing)
+  for (let i = 0; i < portions.length; i++) {
+    const ratio = grams / portions[i].grams
+    if (ratio >= 0.5 && Math.abs(ratio * 2 - Math.round(ratio * 2)) < 0.001) return i
+  }
+  return null
+}
+
+// « 1 oeuf » devient « oeuf » derrière le compteur ; un nom sans « 1 » devant reste lisible
+function portionCountLabel(portion) {
+  const m = portion.name.match(/^\s*1\s+(.+)$/)
+  return m ? m[1] : '× ' + portion.name
+}
+
+function recipeItemKcal(it) {
+  const ing = state.ingredients.find(i => i.id === it.ingredient_id)
+  return ing ? round(ing.kcal * (it.grams || 0) / 100) : 0
+}
+
+function recipeTotalsText(draft) {
+  const totals = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+  draft.items.forEach(it => {
+    const ing = state.ingredients.find(i => i.id === it.ingredient_id)
+    if (ing) {
+      const f = (it.grams || 0) / 100
+      totals.kcal += ing.kcal * f
+      totals.protein += ing.protein * f
+      totals.carbs += ing.carbs * f
+      totals.fat += ing.fat * f
+    }
+  })
+  const n = Math.max(1, parseInt(draft.servings) || 1)
+  return 'Par portion : ' + round(totals.kcal / n) + ' kcal · P ' + round(totals.protein / n) + 'g · G ' + round(totals.carbs / n) + 'g · L ' + round(totals.fat / n) + 'g'
+}
+
+function recipeItemCardHtml(it, idx) {
+  const ing = state.ingredients.find(i => i.id === it.ingredient_id)
+  const portions = ing ? getIngredientPortions(ing) : []
+  const portion = ing && it.portionIdx != null ? portions[it.portionIdx] : null
+  const unit = (ing && ing.unit) || 'g'
+  const stepBtn = 'width:32px;height:32px;padding:0;line-height:1;border-radius:50%;background:var(--surface);color:var(--text);border:1px solid var(--border-strong);font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;'
+
+  let h = '<div style="background:var(--surface-raised);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;">'
+  // Ligne 1 : image, nom (touche pour changer d'ingrédient), kcal de la ligne, suppression
+  h += '<div style="display:flex;align-items:center;gap:10px;">'
+  h += '<div style="width:40px;height:40px;flex-shrink:0;border-radius:8px;overflow:hidden;background:var(--surface);border:1px solid var(--border);">' + ingThumbHtml(ing || {}, '100%', '18px') + '</div>'
+  h += '<button type="button" data-action="open-recipe-ing-picker" data-idx="' + idx + '" style="flex:1;min-width:0;background:none;border:none;padding:0;text-align:left;cursor:pointer;color:var(--text);">'
+  if (ing) {
+    h += '<div style="font-size:var(--text-body);font-weight:600;line-height:1.3;">' + esc(ing.name) + '</div>'
+    h += '<div id="ri-kcal-' + idx + '" style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + recipeItemKcal(it) + ' kcal pour cette ligne</div>'
+  } else {
+    h += '<div style="font-size:var(--text-body);color:var(--text-muted);">Choisir un ingrédient</div>'
+  }
+  h += '</button>'
+  h += '<button type="button" class="icon-btn" data-action="rm-recipe-item" data-idx="' + idx + '" aria-label="Supprimer l\'ingrédient" style="flex-shrink:0;">✕</button>'
+  h += '</div>'
+
+  if (ing) {
+    // Ligne 2 : grammes ou portion (uniquement si l'ingrédient a des portions)
+    if (portions.length > 0) {
+      h += '<div class="segmented" style="margin:12px 0 10px;flex-wrap:wrap;">'
+      h += '<button type="button" class="' + (!portion ? 'active' : '') + '" data-action="ri-mode" data-idx="' + idx + '" data-p="-1">' + (unit === 'ml' ? 'Millilitres' : 'Grammes') + '</button>'
+      portions.forEach((p, pi) => {
+        h += '<button type="button" class="' + (it.portionIdx === pi ? 'active' : '') + '" data-action="ri-mode" data-idx="' + idx + '" data-p="' + pi + '">' + esc(p.name) + ' (' + p.grams + 'g)</button>'
+      })
+      h += '</div>'
+    } else {
+      h += '<div style="height:10px;"></div>'
+    }
+    // Ligne 3 : compteur de portions ou quantité
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'
+    if (portion) {
+      const count = round(it.grams / portion.grams, 2)
+      h += '<div style="display:flex;align-items:center;gap:12px;">'
+      h += '<button type="button" data-action="ri-step" data-idx="' + idx + '" data-delta="-0.5" style="' + stepBtn + '" aria-label="Moins">−</button>'
+      h += '<span style="font-size:var(--text-h3);font-weight:600;min-width:72px;text-align:center;">' + count + ' ' + esc(portionCountLabel(portion)) + '</span>'
+      h += '<button type="button" data-action="ri-step" data-idx="' + idx + '" data-delta="0.5" style="' + stepBtn + '" aria-label="Plus">+</button>'
+      h += '</div>'
+      h += '<span style="font-size:var(--text-small);color:var(--text-muted);">soit ' + round(it.grams, 1) + ' ' + esc(unit) + '</span>'
+    } else {
+      h += '<div style="display:flex;align-items:center;gap:8px;">'
+      h += '<input type="number" inputmode="decimal" placeholder="' + esc(unit) + '" data-ridx="' + idx + '" data-field="grams" value="' + esc(it.grams) + '" style="width:96px;text-align:right;"/>'
+      h += '<span style="font-size:var(--text-body);color:var(--text-muted);">' + esc(unit) + '</span>'
+      h += '</div>'
+      if (portions.length === 0) h += '<span style="font-size:var(--text-small);color:var(--text-muted);">aucune portion enregistrée</span>'
+    }
+    h += '</div>'
+  }
+  h += '</div>'
+  return h
+}
+
 function recipePhotoPreviewHtml(photo) {
   return photo
     ? '<img src="' + esc(photo) + '" style="width:100%;height:100%;object-fit:cover;"/>'
@@ -1374,7 +1469,8 @@ function recipeForm(editId) {
       reference_url: r.reference_url || '',
       photo: r.photo || '',
       instructions: r.instructions || '',
-      items: (r.items || []).map(i => ({ ingredient_id: i.ingredient_id, grams: i.grams }))
+      // portionIdx : affichage seulement (null = grammes) ; non enregistré
+      items: (r.items || []).map(i => ({ ingredient_id: i.ingredient_id, grams: i.grams, portionIdx: detectPortionIdx(state.ingredients.find(x => x.id === i.ingredient_id), i.grams) }))
     }
   }
 
@@ -1413,40 +1509,12 @@ function recipeForm(editId) {
   if (state.ingredients.length === 0) {
     h += '<div class="empty">Ajoute d\'abord des ingrédients.</div>'
   } else {
-    draft.items.forEach((it, idx) => {
-      const ing = state.ingredients.find(i => i.id === it.ingredient_id)
-      const portions = ing ? getIngredientPortions(ing) : []
-      h += '<div class="ing-line">'
-      h += '<button type="button" class="btn small" style="flex:2;text-align:left;" data-action="open-recipe-ing-picker" data-idx="' + idx + '">' + (ing ? esc(ing.name) : 'Choisir un ingrédient') + '</button>'
-      h += '<input type="number" placeholder="g" data-ridx="' + idx + '" data-field="grams" value="' + it.grams + '"/>'
-      h += '<button class="icon-btn" data-action="rm-recipe-item" data-idx="' + idx + '">✕</button>'
-      h += '</div>'
-      if (portions.length > 0) {
-        h += '<select data-portion-ridx="' + idx + '" style="margin:-4px 0 8px;font-size:var(--text-small);">'
-        h += '<option value="">Grammes personnalisés</option>'
-        portions.forEach(p => {
-          h += '<option value="' + p.grams + '">' + esc(p.name) + ' (' + p.grams + 'g)</option>'
-        })
-        h += '</select>'
-      }
-    })
-    h += '<button class="btn small" data-action="add-recipe-item" style="margin-bottom:14px;">+ Ajouter un ingrédient</button>'
+    draft.items.forEach((it, idx) => { h += recipeItemCardHtml(it, idx) })
+    h += '<button type="button" data-action="add-recipe-item" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;margin-bottom:14px;background:none;border:1px dashed var(--border-strong);border-radius:10px;color:var(--text-muted);font-size:var(--text-body);cursor:pointer;"><span style="font-size:18px;line-height:1;">+</span>Ajouter un ingrédient</button>'
   }
 
   if (draft.items.length > 0) {
-    const totals = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
-    draft.items.forEach(it => {
-      const ing = state.ingredients.find(i => i.id === it.ingredient_id)
-      if (ing) {
-        const f = it.grams / 100
-        totals.kcal += ing.kcal * f
-        totals.protein += ing.protein * f
-        totals.carbs += ing.carbs * f
-        totals.fat += ing.fat * f
-      }
-    })
-    const s = Math.max(1, parseInt(draft.servings) || 1)
-    h += '<div class="card" style="background:var(--surface-raised);margin-bottom:14px;"><div class="sub">Par portion : ' + round(totals.kcal / s) + ' kcal · P ' + round(totals.protein / s) + 'g · G ' + round(totals.carbs / s) + 'g · L ' + round(totals.fat / s) + 'g</div></div>'
+    h += '<div class="card" style="background:var(--surface-raised);margin-bottom:14px;"><div class="sub" id="rf-totals">' + recipeTotalsText(draft) + '</div></div>'
   }
 
   h += '<label class="field"><span class="lbl">Instructions</span><textarea id="rf-instructions" rows="6" placeholder="Étapes de la recette…" style="resize:vertical;">' + esc(draft.instructions) + '</textarea></label>'
@@ -1519,8 +1587,7 @@ function logQuantityPanelHtml(kind, item) {
     }
     if (active) {
       // « 1 gaufre » devient « 1,5 gaufre » pour 1,5 portion ; un nom sans « 1 » devant reste lisible
-      const m = active.name.match(/^\s*1\s+(.+)$/)
-      h += stepper(m ? m[1] : '× ' + active.name)
+      h += stepper(portionCountLabel(active))
     } else {
       h += '<label class="field" style="margin-bottom:12px;"><span class="lbl">Quantité (' + esc(unit) + ')</span><input type="number" id="log-qty" inputmode="decimal" value="' + esc(state.logQty) + '"/></label>'
     }
@@ -2107,24 +2174,18 @@ function bindEvents() {
     })
   }
 
-  // Recipe item fields
+  // Quantité saisie en grammes : on met à jour les kcal sans réafficher la page (le clavier reste ouvert)
   app.querySelectorAll('[data-ridx]').forEach(inp => {
-    inp.addEventListener(inp.tagName === 'SELECT' ? 'change' : 'input', () => {
+    inp.addEventListener('input', () => {
       if (!state._draftRecipe) return
       const idx = parseInt(inp.getAttribute('data-ridx'))
-      const field = inp.getAttribute('data-field')
-      state._draftRecipe.items[idx][field] = field === 'grams' ? parseFloat(inp.value) || 0 : inp.value
-      render()
-    })
-  })
-
-  // Recipe item portion quick-select
-  app.querySelectorAll('[data-portion-ridx]').forEach(sel => {
-    sel.addEventListener('change', () => {
-      if (!state._draftRecipe || !sel.value) return
-      const idx = parseInt(sel.getAttribute('data-portion-ridx'))
-      state._draftRecipe.items[idx].grams = parseFloat(sel.value)
-      render()
+      const it = state._draftRecipe.items[idx]
+      if (!it) return
+      it.grams = parseFloat(inp.value) || 0
+      const kcal = document.getElementById('ri-kcal-' + idx)
+      if (kcal) kcal.textContent = recipeItemKcal(it) + ' kcal pour cette ligne'
+      const totals = document.getElementById('rf-totals')
+      if (totals) totals.textContent = recipeTotalsText(state._draftRecipe)
     })
   })
 
@@ -2759,7 +2820,7 @@ function handleAction(action, el) {
     render()
   } else if (action === 'add-recipe-item') {
     if (!state._draftRecipe) return
-    state._draftRecipe.items.push({ ingredient_id: null, grams: 100 })
+    state._draftRecipe.items.push({ ingredient_id: null, grams: 100, portionIdx: null })
     state._recipeIngPickerIdx = state._draftRecipe.items.length - 1
     state._recipeIngPickerSearch = ''
     state.modal = { type: 'recipe-ing-picker' }
@@ -2774,9 +2835,34 @@ function handleAction(action, el) {
     render()
   } else if (action === 'pick-recipe-ingredient') {
     if (state._draftRecipe && state._recipeIngPickerIdx != null) {
-      state._draftRecipe.items[state._recipeIngPickerIdx].ingredient_id = el.getAttribute('data-id')
+      const picked = state._draftRecipe.items[state._recipeIngPickerIdx]
+      if (picked.ingredient_id !== el.getAttribute('data-id')) picked.portionIdx = null
+      picked.ingredient_id = el.getAttribute('data-id')
     }
     state.modal = { type: 'add-recipe', editId: state._draftRecipe ? state._draftRecipe.__for : null }
+    render()
+  } else if (action === 'ri-mode') {
+    const it = state._draftRecipe && state._draftRecipe.items[parseInt(el.getAttribute('data-idx'))]
+    if (!it) return
+    const pIdx = parseInt(el.getAttribute('data-p'))
+    if (pIdx === -1) {
+      it.portionIdx = null
+    } else {
+      const ing = state.ingredients.find(i => i.id === it.ingredient_id)
+      const portion = ing ? getIngredientPortions(ing)[pIdx] : null
+      if (!portion) return
+      it.portionIdx = pIdx
+      it.grams = portion.grams   // 1 portion pour commencer
+    }
+    render()
+  } else if (action === 'ri-step') {
+    const it = state._draftRecipe && state._draftRecipe.items[parseInt(el.getAttribute('data-idx'))]
+    if (!it || it.portionIdx == null) return
+    const ing = state.ingredients.find(i => i.id === it.ingredient_id)
+    const portion = ing ? getIngredientPortions(ing)[it.portionIdx] : null
+    if (!portion) return
+    const count = Math.max(0.5, it.grams / portion.grams + (parseFloat(el.getAttribute('data-delta')) || 0))
+    it.grams = round(count * portion.grams, 2)
     render()
   } else if (action === 'rm-recipe-item') {
     const idx = parseInt(el.getAttribute('data-idx'))
@@ -2818,7 +2904,7 @@ function handleAction(action, el) {
       type: type,
       reference_url: document.getElementById('rf-reference-url').value.trim(),
       photo: document.getElementById('rf-photo-url').value.trim(),
-      items: draft.items
+      items: draft.items.map(it => ({ ingredient_id: it.ingredient_id, grams: it.grams }))
     }
     const instructions = document.getElementById('rf-instructions').value.trim()
     const existingRecipe = editId2 ? state.recipes.find(r => r.id === editId2) : null
