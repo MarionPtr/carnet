@@ -140,10 +140,14 @@ const state = {
   recipeVisibleTypes: savedPrefs.recipeVisibleTypes || null, // null = tous visibles, sinon tableau de types cochés
   recipeFavoritesOnly: !!savedPrefs.recipeFavoritesOnly,
   collapsedRecipeTypes: savedPrefs.collapsedRecipeTypes || {},
+  logPage: false, // page « Ajouter au journal » ouverte
   logType: 'recipe',
   logMeal: 'petit-dej',
-  logIngId: null,
+  logSearch: '',
+  logExpanded: null, // { kind: 'recipe' | 'ingredient', id } : ligne dont le panneau de quantité est ouvert
+  logQty: 1, // portions (recette / portion d'ingrédient) ou grammes / ml
   logPortionIdx: null, // null = grammes personnalisés, sinon index dans getIngredientPortions(ing)
+  _logScrollY: 0,
   _ingDetailPortionIdx: null,
   _draftIngredient: null,
   _draftRecipe: null,
@@ -234,14 +238,15 @@ function render() {
   let html = ''
   if (state.viewRecipeId && !state.recipes.some(r => r.id === state.viewRecipeId)) state.viewRecipeId = null
   if (state.viewIngId && !state.ingredients.some(i => i.id === state.viewIngId)) state.viewIngId = null
-  if (state.viewRecipeId) html = renderRecipePage()
+  if (state.logPage) html = renderLogPage()
+  else if (state.viewRecipeId) html = renderRecipePage()
   else if (state.viewIngId) html = renderIngredientPage()
   else if (state.tab === 'today') html = renderToday()
   else if (state.tab === 'ingredients') html = renderIngredients()
   else if (state.tab === 'recipes') html = renderRecipes()
   else if (state.tab === 'profile') html = state.profilePage ? renderProfileSubPage() : renderProfile()
 
-  if (state.tab !== 'profile' && !state.viewRecipeId && !state.viewIngId) html += renderTabs()
+  if (state.tab !== 'profile' && !state.viewRecipeId && !state.viewIngId && !state.logPage) html += renderTabs()
   if (state.modal) html += renderModal()
   if (state.toastMsg) html += `<div class="toast">${esc(state.toastMsg)}</div>`
 
@@ -1159,7 +1164,6 @@ function renderModal() {
 
   if (m.type === 'add-ing') body = ingredientForm(m.editId)
   else if (m.type === 'add-recipe') body = recipeForm(m.editId)
-  else if (m.type === 'add-log') body = addLogForm()
   else if (m.type === 'edit-profile') body = editProfileForm()
   else if (m.type === 'edit-category') body = editCategoryForm(m.categoryIdx)
   else if (m.type === 'edit-family') body = editFamilyForm(m.familyId)
@@ -1411,65 +1415,139 @@ function recipeForm(editId) {
   return h
 }
 
-function addLogForm() {
-  let h = '<h2>Ajouter au journal</h2>'
+// ========== PAGE « AJOUTER AU JOURNAL » ==========
+function logSelection() {
+  // Élément dont le panneau de quantité est ouvert + calcul de l'entrée correspondante
+  const sel = state.logExpanded
+  if (!sel) return null
+  const qty = parseFloat(state.logQty) || 0
+  if (sel.kind === 'recipe') {
+    const r = state.recipes.find(x => x.id === sel.id)
+    if (!r) return null
+    const m = recipeMacrosPerServing(r, state.ingredients)
+    return { kind: 'recipe', item: r, qty, kcal: m.kcal * qty, protein: m.protein * qty, carbs: m.carbs * qty, fat: m.fat * qty }
+  }
+  const ing = state.ingredients.find(x => x.id === sel.id)
+  if (!ing) return null
+  const portions = getIngredientPortions(ing)
+  const portion = state.logPortionIdx != null ? portions[state.logPortionIdx] : null
+  const grams = portion ? qty * portion.grams : qty
+  const f = grams / 100
+  return { kind: 'ingredient', item: ing, qty, portion, grams, kcal: ing.kcal * f, protein: ing.protein * f, carbs: ing.carbs * f, fat: ing.fat * f }
+}
+
+function logPreviewHtml() {
+  const sel = logSelection()
+  if (!sel) return ''
+  return '<span style="font-weight:700;">' + round(sel.kcal) + ' kcal</span> · P ' + round(sel.protein) + ' g · G ' + round(sel.carbs) + ' g · L ' + round(sel.fat) + ' g'
+}
+
+function logThumbHtml(kind, item) {
+  if (kind === 'recipe') {
+    return item.photo
+      ? '<img src="' + esc(item.photo) + '" style="width:100%;height:100%;object-fit:cover;display:block;"/>'
+      : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:24px;">🍽️</div>'
+  }
+  return ingThumbHtml(item, '100%', '24px')
+}
+
+function logQuantityPanelHtml(kind, item) {
+  const stepBtn = 'width:34px;height:34px;padding:0;line-height:1;border-radius:50%;background:var(--surface);color:var(--text);border:1px solid var(--border-strong);font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;'
+  const stepper = unitLabel => {
+    return '<div style="display:flex;align-items:center;justify-content:center;gap:14px;margin:4px 0 12px;">'
+      + '<button type="button" data-action="log-qty-step" data-delta="-0.5" style="' + stepBtn + '" aria-label="Moins">−</button>'
+      + '<span style="font-size:var(--text-h3);font-weight:600;min-width:120px;text-align:center;">' + round(parseFloat(state.logQty) || 0, 2) + ' ' + esc(unitLabel) + '</span>'
+      + '<button type="button" data-action="log-qty-step" data-delta="0.5" style="' + stepBtn + '" aria-label="Plus">+</button>'
+      + '</div>'
+  }
+  let h = '<div style="padding:12px 12px 14px;background:var(--surface-raised);border-top:1px solid var(--border);">'
+  if (kind === 'recipe') {
+    h += stepper('part' + ((parseFloat(state.logQty) || 0) > 1 ? 's' : ''))
+  } else {
+    const portions = getIngredientPortions(item)
+    const active = state.logPortionIdx != null ? portions[state.logPortionIdx] : null
+    const unit = item.unit || 'g'
+    if (portions.length > 0) {
+      h += '<div class="segmented" style="margin-bottom:12px;flex-wrap:wrap;">'
+      h += '<button type="button" class="' + (!active ? 'active' : '') + '" data-action="set-log-portion" data-idx="-1" style="font-size:var(--text-body);">' + (unit === 'ml' ? 'Millilitres' : 'Grammes') + '</button>'
+      portions.forEach((p, idx) => {
+        h += '<button type="button" class="' + (state.logPortionIdx === idx ? 'active' : '') + '" data-action="set-log-portion" data-idx="' + idx + '" style="font-size:var(--text-body);">' + esc(p.name) + ' (' + p.grams + 'g)</button>'
+      })
+      h += '</div>'
+    }
+    if (active) {
+      // « 1 gaufre » devient « 1,5 gaufre » pour 1,5 portion ; un nom sans « 1 » devant reste lisible
+      const m = active.name.match(/^\s*1\s+(.+)$/)
+      h += stepper(m ? m[1] : '× ' + active.name)
+    } else {
+      h += '<label class="field" style="margin-bottom:12px;"><span class="lbl">Quantité (' + esc(unit) + ')</span><input type="number" id="log-qty" inputmode="decimal" value="' + esc(state.logQty) + '"/></label>'
+    }
+  }
+  h += '<div id="log-preview" style="text-align:center;font-size:var(--text-body);color:var(--text-muted);margin-bottom:12px;">' + logPreviewHtml() + '</div>'
+  h += '<button class="btn primary block" data-action="confirm-log" style="display:flex;align-items:center;justify-content:center;gap:8px;">'
+  h += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12 10 18 20 6"/></svg><span>Ajouter au journal</span></button>'
+  h += '</div>'
+  return h
+}
+
+function renderLogPage() {
+  const q = state.logSearch.trim().toLowerCase()
+  const type = state.logType === 'ingredient' ? 'ingredient' : 'recipe'
+  const recipes = state.recipes.filter(r => !q || r.name.toLowerCase().indexOf(q) > -1).sort((a, b) => a.name.localeCompare(b.name))
+  const ingredients = state.ingredients.filter(i => !q || ingMatchesSearch(i, q)).sort((a, b) => a.name.localeCompare(b.name))
+  const list = type === 'recipe' ? recipes : ingredients
+
+  let h = '<header class="top" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+  h += '<button data-action="close-log-page" title="Retour au journal" aria-label="Retour au journal" style="width:40px;height:40px;flex-shrink:0;padding:0;border-radius:50%;background:var(--surface-raised);color:var(--text);border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;cursor:pointer;"><span class="header-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></span></button>'
+  h += '<h1 style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;text-align:center;flex:1;">Ajouter au journal</h1>'
+  h += '<div style="width:40px;flex-shrink:0;"></div>'
+  h += '</header>'
+
+  h += '<section style="padding-bottom:32px;">'
   h += '<label class="field"><span class="lbl">Repas</span><select id="log-meal">'
   MEALS.forEach(meal => {
     h += '<option value="' + meal.key + '" ' + (state.logMeal === meal.key ? 'selected' : '') + '>' + meal.label + '</option>'
   })
   h += '</select></label>'
-  h += '<div class="segmented" id="log-type" style="margin-bottom:14px;">'
-  h += '<button type="button" class="' + (state.logType !== 'ingredient' ? 'active' : '') + '" data-logtype="recipe">Recette</button>'
-  h += '<button type="button" class="' + (state.logType === 'ingredient' ? 'active' : '') + '" data-logtype="ingredient">Ingrédient</button>'
+
+  h += '<div class="search-wrap" style="position:relative;">'
+  h += '<input id="log-search" placeholder="Rechercher une recette ou un ingrédient…" value="' + esc(state.logSearch) + '" style="' + (state.logSearch ? 'padding-right:36px;' : '') + '"/>'
+  if (state.logSearch) {
+    h += '<button class="icon-btn" data-action="clear-log-search" aria-label="Effacer la recherche" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:var(--text-h3);">✕</button>'
+  }
   h += '</div>'
 
-  if ((state.logType || 'recipe') === 'recipe') {
-    if (state.recipes.length === 0) {
-      h += '<div class="empty">Aucune recette pour l\'instant.</div>'
-    } else {
-      h += '<label class="field"><span class="lbl">Recette</span><select id="log-recipe">'
-      state.recipes.forEach(r => {
-        h += '<option value="' + r.id + '">' + esc(r.name) + '</option>'
-      })
-      h += '</select></label>'
-      h += '<label class="field"><span class="lbl">Portions</span><input type="number" id="log-servings" value="1" step="0.5" min="0.25"/></label>'
-      h += '<button class="btn primary block" data-action="confirm-log-recipe">Ajouter</button>'
-    }
+  const count = n => (q ? ' (' + n + ')' : '')
+  h += '<div class="segmented" style="margin-bottom:14px;">'
+  h += '<button type="button" class="' + (type === 'recipe' ? 'active' : '') + '" data-action="set-log-type" data-type="recipe" style="font-size:var(--text-body);">Recette' + count(recipes.length) + '</button>'
+  h += '<button type="button" class="' + (type === 'ingredient' ? 'active' : '') + '" data-action="set-log-type" data-type="ingredient" style="font-size:var(--text-body);">Ingrédient' + count(ingredients.length) + '</button>'
+  h += '</div>'
+
+  if (list.length === 0) {
+    const none = q ? 'Aucun résultat.' : (type === 'recipe' ? 'Aucune recette pour l\'instant.' : 'Aucun ingrédient pour l\'instant.')
+    h += '<div class="empty">' + none + '</div>'
   } else {
-    if (state.ingredients.length === 0) {
-      h += '<div class="empty">Aucun ingrédient pour l\'instant.</div>'
-    } else {
-      if (!state.logIngId || !state.ingredients.find(i => i.id === state.logIngId)) {
-        state.logIngId = state.ingredients[0].id
-      }
-      const selectedIng = state.ingredients.find(i => i.id === state.logIngId)
-      h += '<label class="field"><span class="lbl">Ingrédient</span><select id="log-ing">'
-      state.ingredients.forEach(i => {
-        h += '<option value="' + i.id + '" ' + (i.id === state.logIngId ? 'selected' : '') + '>' + esc(i.name) + '</option>'
-      })
-      h += '</select></label>'
-
-      const logPortions = selectedIng ? getIngredientPortions(selectedIng) : []
-      const activeLogPortion = (state.logPortionIdx != null && logPortions[state.logPortionIdx]) ? logPortions[state.logPortionIdx] : null
-
-      if (logPortions.length > 0) {
-        h += '<div class="segmented" style="margin-bottom:10px;flex-wrap:wrap;">'
-        h += '<button type="button" class="' + (!activeLogPortion ? 'active' : '') + '" data-action="set-log-portion" data-idx="-1">Grammes</button>'
-        logPortions.forEach((p, idx) => {
-          h += '<button type="button" class="' + (state.logPortionIdx === idx ? 'active' : '') + '" data-action="set-log-portion" data-idx="' + idx + '">' + esc(p.name) + ' (' + p.grams + 'g)</button>'
-        })
-        h += '</div>'
-      }
-
-      if (activeLogPortion) {
-        h += '<label class="field"><span class="lbl">Nombre de ' + esc(activeLogPortion.name) + '</span><input type="number" id="log-portions" value="1" step="0.5" min="0.25"/></label>'
-      } else {
-        h += '<label class="field"><span class="lbl">Quantité (' + (selectedIng.unit || 'g') + ')</span><input type="number" id="log-grams" value="100"/></label>'
-      }
-      h += '<button class="btn primary block" data-action="confirm-log-ing">Ajouter</button>'
-    }
+    h += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">'
+    list.forEach((item, idx) => {
+      const expanded = !!state.logExpanded && state.logExpanded.kind === type && state.logExpanded.id === item.id
+      const sub = type === 'recipe'
+        ? round(recipeMacrosPerServing(item, state.ingredients).kcal) + ' kcal / part'
+        : ((item.brands && item.brands.length > 0) ? esc(item.brands.join(', ')) : '')
+      h += '<div style="' + (idx < list.length - 1 || expanded ? 'border-bottom:1px solid var(--border);' : '') + '">'
+      h += '<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;">'
+      h += '<div style="width:56px;height:56px;flex-shrink:0;border-radius:10px;overflow:hidden;background:var(--surface-raised);border:1px solid var(--border);">' + logThumbHtml(type, item) + '</div>'
+      h += '<div style="flex:1;min-width:0;">'
+      h += '<div style="font-size:var(--text-h3);font-weight:600;line-height:1.3;">' + esc(item.name) + '</div>'
+      if (sub) h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + sub + '</div>'
+      h += '</div>'
+      h += '<button data-action="toggle-log-item" data-kind="' + type + '" data-id="' + item.id + '" title="Ajouter" aria-label="Ajouter ' + esc(item.name) + '" style="width:40px;height:40px;flex-shrink:0;padding:0;line-height:1;border-radius:50%;background:' + (expanded ? 'var(--protein)' : 'var(--surface-raised)') + ';border:1px solid var(--border-strong);color:' + (expanded ? '#221705' : 'var(--text)') + ';font-size:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;"><span style="display:block;transition:transform .15s ease;transform:rotate(' + (expanded ? '45deg' : '0deg') + ');">+</span></button>'
+      h += '</div>'
+      if (expanded) h += logQuantityPanelHtml(type, item)
+      h += '</div>'
+    })
+    h += '</div>'
   }
-
+  h += '</section>'
   return h
 }
 
@@ -1933,21 +2011,30 @@ function bindEvents() {
     })
   }
 
-  // Log type toggle
-  app.querySelectorAll('[data-logtype]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      state.logType = btn.getAttribute('data-logtype')
+  // Recherche de la page « Ajouter au journal »
+  const logSearchInput = document.getElementById('log-search')
+  if (logSearchInput) {
+    logSearchInput.addEventListener('input', () => {
+      state.logSearch = logSearchInput.value
+      state.logExpanded = null
       render()
+      setTimeout(() => {
+        const el = document.getElementById('log-search')
+        if (el) {
+          el.focus()
+          el.selectionStart = el.selectionEnd = el.value.length
+        }
+      }, 0)
     })
-  })
+  }
 
-  // Log ingredient select - refresh to show/hide the portion shortcut
-  const logIngSelect = document.getElementById('log-ing')
-  if (logIngSelect) {
-    logIngSelect.addEventListener('change', () => {
-      state.logIngId = logIngSelect.value
-      state.logPortionIdx = null
-      render()
+  // Quantité saisie : on met à jour l'aperçu sans réafficher la page (le clavier reste ouvert)
+  const logQtyInput = document.getElementById('log-qty')
+  if (logQtyInput) {
+    logQtyInput.addEventListener('input', () => {
+      state.logQty = logQtyInput.value
+      const preview = document.getElementById('log-preview')
+      if (preview) preview.innerHTML = logPreviewHtml()
     })
   }
 
@@ -2664,36 +2751,53 @@ function handleAction(action, el) {
   } else if (action === 'set-log-portion') {
     const idx = parseInt(el.getAttribute('data-idx'))
     state.logPortionIdx = idx === -1 ? null : idx
+    state.logQty = idx === -1 ? 100 : 1
     render()
   } else if (action === 'open-add-log') {
+    state._logScrollY = window.scrollY
+    state.logPage = true
     state.logType = 'recipe'
-    state.logIngId = null
+    state.logSearch = ''
+    state.logExpanded = null
     state.logPortionIdx = null
     state.logMeal = el.getAttribute('data-meal') || defaultMealForNow()
-    state.modal = { type: 'add-log' }
-    render()
-  } else if (action === 'confirm-log-recipe') {
-    const rid3 = document.getElementById('log-recipe').value
-    const servings2 = parseFloat(document.getElementById('log-servings').value) || 1
-    logRecipe(rid3, servings2)
     state.modal = null
     render()
-    showToast('Ajouté au journal')
-  } else if (action === 'confirm-log-ing') {
-    const iid = document.getElementById('log-ing').value
-    let grams
-    if (state.logPortionIdx != null) {
-      const ing = state.ingredients.find(i => i.id === iid)
-      const portions = getIngredientPortions(ing)
-      const p = portions[state.logPortionIdx]
-      const count = parseFloat(document.getElementById('log-portions').value) || 0
-      grams = count * (p ? p.grams : 0)
-    } else {
-      grams = parseFloat(document.getElementById('log-grams').value) || 0
+    window.scrollTo(0, 0)
+  } else if (action === 'close-log-page') {
+    state.logPage = false
+    state.logExpanded = null
+    render()
+    window.scrollTo(0, state._logScrollY)
+  } else if (action === 'set-log-type') {
+    state.logType = el.getAttribute('data-type')
+    state.logExpanded = null
+    render()
+  } else if (action === 'clear-log-search') {
+    state.logSearch = ''
+    state.logExpanded = null
+    render()
+  } else if (action === 'toggle-log-item') {
+    const kind = el.getAttribute('data-kind')
+    const id = el.getAttribute('data-id')
+    const open = state.logExpanded && state.logExpanded.kind === kind && state.logExpanded.id === id
+    state.logExpanded = open ? null : { kind, id }
+    state.logQty = kind === 'recipe' ? 1 : 100
+    state.logPortionIdx = null
+    render()
+  } else if (action === 'log-qty-step') {
+    const delta = parseFloat(el.getAttribute('data-delta')) || 0
+    state.logQty = Math.max(0.5, (parseFloat(state.logQty) || 0) + delta)
+    render()
+  } else if (action === 'confirm-log') {
+    const sel = logSelection()
+    if (!sel || !(sel.qty > 0)) {
+      showToast('Indique une quantité')
+      return
     }
-    logIngredient(iid, grams)
-    state.modal = null
-    render()
+    if (sel.kind === 'recipe') logRecipe(sel.item.id, sel.qty)
+    else logIngredient(sel.item.id, sel.grams)
+    state.logExpanded = null
     showToast('Ajouté au journal')
   } else if (action === 'del-log') {
     const lid = el.getAttribute('data-id')
@@ -2900,7 +3004,7 @@ function logIngredient(ingId, grams) {
     kind: 'ingredient',
     ref_id: i.id,
     meal: state.logMeal,
-    name: i.name + ' (' + grams + 'g)',
+    name: i.name + ' (' + round(grams, 1) + (i.unit || 'g') + ')',
     kcal: i.kcal * f,
     protein: i.protein * f,
     carbs: i.carbs * f,
