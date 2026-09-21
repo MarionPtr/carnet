@@ -1712,18 +1712,21 @@ function ingredientDetailBody(ingId) {
   }
   h += '</div>'
 
-  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
+  const hasBrand = ing.brands && ing.brands.length > 0
+  h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (hasBrand ? '4px' : '14px') + ';">'
+  h += '<div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">'
   h += '<h2 style="margin:0;">' + esc(ing.name) + '</h2>'
-  h += '<button data-action="toggle-favorite" data-id="' + ing.id + '" style="background:none;border:none;cursor:pointer;font-size:22px;line-height:1;padding:2px;color:' + (ing.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (ing.is_favorite ? '★' : '☆') + '</button>'
+  h += '<button data-action="toggle-favorite" data-id="' + ing.id + '" style="background:none;border:none;cursor:pointer;font-size:22px;line-height:1;padding:2px;flex-shrink:0;color:' + (ing.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (ing.is_favorite ? '★' : '☆') + '</button>'
+  h += '</div>'
+  if (ing.category) {
+    h += '<div style="flex-shrink:0;padding:4px 10px;background:var(--protein);color:#221705;border-radius:6px;font-size:var(--text-caption);font-weight:600;">' + esc(ing.category) + '</div>'
+  }
   h += '</div>'
 
   const portions = getIngredientPortions(ing)
 
-  // Category + Brands
-  if (ing.category) {
-    h += '<div style="display:inline-block;padding:4px 10px;background:var(--protein);color:#221705;border-radius:6px;font-size:var(--text-caption);font-weight:600;margin-bottom:12px;">' + esc(ing.category) + '</div>'
-  }
-  if (ing.brands && ing.brands.length > 0) {
+  // Marque
+  if (hasBrand) {
     h += '<div style="color:var(--text-muted);font-size:var(--text-small);margin-bottom:16px;">' + ing.brands.join(', ') + '</div>'
   }
 
