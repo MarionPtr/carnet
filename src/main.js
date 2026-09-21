@@ -1781,9 +1781,18 @@ function showToast(msg, duration) {
   state.toastMsg = msg
   render()
   setTimeout(() => {
+    if (state.toastMsg !== msg) return
     state.toastMsg = null
     render()
   }, duration || 2200)
+}
+
+// Enregistre en arrière-plan ; prévient si la base refuse l'écriture au lieu d'afficher un faux « enregistré »
+function persist(promise) {
+  Promise.resolve(promise).catch(e => {
+    console.error('Échec de l\'enregistrement:', e)
+    showToast('L\'enregistrement a échoué (' + ((e && e.message) || 'erreur inconnue') + '). Recharge la page puis réessaie.', 7000)
+  })
 }
 
 function bindEvents() {
@@ -1846,7 +1855,7 @@ function bindEvents() {
   app.querySelectorAll('[data-goal]').forEach(btn => {
     btn.addEventListener('click', () => {
       state.profile.goal = btn.getAttribute('data-goal')
-      saveProfile(state.profile)
+      persist(saveProfile(state.profile))
       render()
     })
   })
@@ -1873,7 +1882,7 @@ function bindEvents() {
       else value = el.value
 
       state.profile[field] = value
-      saveProfile(state.profile)
+      persist(saveProfile(state.profile))
       if (field === 'display_name') state.personNames = null
     })
   })
@@ -1887,13 +1896,13 @@ function bindEvents() {
     autoRadio.addEventListener('change', () => {
       state.profile.use_custom = false
       customMacrosDiv.style.display = 'none'
-      saveProfile(state.profile)
+      persist(saveProfile(state.profile))
       refreshObjectiveSummary()
     })
     customRadio.addEventListener('change', () => {
       state.profile.use_custom = true
       customMacrosDiv.style.display = 'block'
-      saveProfile(state.profile)
+      persist(saveProfile(state.profile))
       refreshObjectiveSummary()
     })
   }
@@ -2113,7 +2122,7 @@ function bindCustomMacroInputs() {
         gramsDisplay.innerHTML = round(protein) + 'g P · ' + round(carbs) + 'g G · ' + round(fat) + 'g L' +
           (totalPct !== 100 ? ' <span style="color:var(--danger);">(total ' + round(totalPct) + '%)</span>' : '')
       }
-      saveProfile(state.profile)
+      persist(saveProfile(state.profile))
       refreshObjectiveSummary()
     }
 
@@ -2137,7 +2146,7 @@ function bindCustomMacroInputs() {
       state.profile.custom_kcal = kcal
 
       if (kcalDisplay) kcalDisplay.textContent = round(kcal)
-      saveProfile(state.profile)
+      persist(saveProfile(state.profile))
       refreshObjectiveSummary()
     }
 
@@ -2190,7 +2199,7 @@ function handleAction(action, el) {
     const ing = state.ingredients.find(i => i.id === id)
     if (ing) {
       ing.is_favorite = !ing.is_favorite
-      saveIngredient(ing)
+      persist(saveIngredient(ing))
       render()
     }
   } else if (action === 'toggle-family') {
@@ -2303,7 +2312,7 @@ function handleAction(action, el) {
     const recipe = state.recipes.find(r => r.id === el.getAttribute('data-id'))
     if (recipe) {
       recipe.is_favorite = !recipe.is_favorite
-      setRecipeFavorite(recipe.id, recipe.is_favorite)
+      persist(setRecipeFavorite(recipe.id, recipe.is_favorite))
       render()
     }
   } else if (action === 'paste-field') {
@@ -2314,7 +2323,7 @@ function handleAction(action, el) {
     render()
   } else if (action === 'set-custom-mode') {
     state.profile.custom_mode = el.getAttribute('data-mode')
-    saveProfile(state.profile)
+    persist(saveProfile(state.profile))
     render()
   } else if (action === 'close-profile') {
     state.tab = 'today'
@@ -2413,7 +2422,7 @@ function handleAction(action, el) {
   } else if (action === 'del-ing') {
     const id = el.getAttribute('data-id')
     state.ingredients = state.ingredients.filter(i => i.id !== id)
-    deleteIngredient(id)
+    persist(deleteIngredient(id))
     state.modal = null
     state.viewIngId = null
     render()
@@ -2480,7 +2489,7 @@ function handleAction(action, el) {
         }
         if (!state.categories.includes(category)) {
           state.categories.push(category)
-          addCategory(category)
+          persist(addCategory(category))
         }
       }
 
@@ -2506,7 +2515,7 @@ function handleAction(action, el) {
       } else {
         state.ingredients.push(obj)
       }
-      saveIngredient(obj)
+      persist(saveIngredient(obj))
       state._draftIngredient = null
       state.modal = null
       render()
@@ -2523,7 +2532,7 @@ function handleAction(action, el) {
   } else if (action === 'del-recipe') {
     const rid = el.getAttribute('data-id')
     state.recipes = state.recipes.filter(r => r.id !== rid)
-    deleteRecipe(rid)
+    persist(deleteRecipe(rid))
     state.modal = null
     state.viewRecipeId = null
     render()
@@ -2580,7 +2589,7 @@ function handleAction(action, el) {
       }
       if (!state.recipeTypes.includes(type)) {
         state.recipeTypes.push(type)
-        addRecipeType(type)
+        persist(addRecipeType(type))
       }
     }
     const obj2 = {
@@ -2602,7 +2611,7 @@ function handleAction(action, el) {
     } else {
       state.recipes.push(obj2)
     }
-    saveRecipe(obj2)
+    persist(saveRecipe(obj2))
     state._draftRecipe = null
     state.modal = null
     render()
@@ -2644,7 +2653,7 @@ function handleAction(action, el) {
   } else if (action === 'del-log') {
     const lid = el.getAttribute('data-id')
     state.logs = state.logs.filter(e => e.id !== lid)
-    deleteLog(lid)
+    persist(deleteLog(lid))
     render()
   } else if (action === 'save-profile') {
     const p = state.profile
@@ -2653,7 +2662,7 @@ function handleAction(action, el) {
     p.birthdate = document.getElementById('p-birthdate').value || p.birthdate
     p.sex = document.getElementById('p-sex').value
     p.activity = parseFloat(document.getElementById('p-activity').value)
-    saveProfile(p)
+    persist(saveProfile(p))
     state.modal = null
     render()
     showToast('Profil enregistré')
@@ -2666,7 +2675,7 @@ function handleAction(action, el) {
     }
     if (!state.categories.includes(cat)) {
       state.categories.push(cat)
-      addCategory(cat)
+      persist(addCategory(cat))
       input.value = ''
       render()
     } else {
@@ -2706,7 +2715,7 @@ function handleAction(action, el) {
     const fam = state.families.find(f => f.id === id)
     if (fam) fam.name = name
     state.families.sort((a, b) => a.name.localeCompare(b.name))
-    renameFamily(id, name)
+    persist(renameFamily(id, name))
     state.modal = null
     render()
     showToast('Famille modifiée')
@@ -2716,7 +2725,7 @@ function handleAction(action, el) {
     Object.keys(state.categoryFamily).forEach(c => {
       if (state.categoryFamily[c] === id) delete state.categoryFamily[c]
     })
-    deleteFamily(id)
+    persist(deleteFamily(id))
     render()
   } else if (action === 'edit-category') {
     const idx = parseInt(el.getAttribute('data-idx'))
@@ -2742,11 +2751,11 @@ function handleAction(action, el) {
     })
     if (oldName !== newName) {
       delete state.categoryFamily[oldName]
-      renameCategory(oldName, newName)
+      persist(renameCategory(oldName, newName))
     }
     if (newFamily) state.categoryFamily[newName] = newFamily
     else delete state.categoryFamily[newName]
-    setCategoryFamily(newName, newFamily)
+    persist(setCategoryFamily(newName, newFamily))
     state.modal = null
     render()
     showToast('Catégorie modifiée')
@@ -2755,7 +2764,7 @@ function handleAction(action, el) {
     const name = state.categories[idx]
     state.categories.splice(idx, 1)
     delete state.categoryFamily[name]
-    deleteCategory(name)
+    persist(deleteCategory(name))
     render()
   } else if (action === 'add-recipe-type') {
     const input = document.getElementById('new-recipe-type-input')
@@ -2766,7 +2775,7 @@ function handleAction(action, el) {
     }
     if (!state.recipeTypes.includes(type)) {
       state.recipeTypes.push(type)
-      addRecipeType(type)
+      persist(addRecipeType(type))
       input.value = ''
       render()
     } else {
@@ -2792,7 +2801,7 @@ function handleAction(action, el) {
     state.recipes.forEach(r => {
       if (r.type === oldName) r.type = newName
     })
-    renameRecipeType(oldName, newName)
+    persist(renameRecipeType(oldName, newName))
     state.modal = null
     render()
     showToast('Type modifié')
@@ -2800,7 +2809,7 @@ function handleAction(action, el) {
     const idx = parseInt(el.getAttribute('data-idx'))
     const name = state.recipeTypes[idx]
     state.recipeTypes.splice(idx, 1)
-    deleteRecipeType(name)
+    persist(deleteRecipeType(name))
     render()
   } else if (action === 'close-modal' || action === 'close-modal-bg') {
     if (state.modal && state.modal.type === 'recipe-ing-picker') {
@@ -2832,7 +2841,7 @@ function logRecipe(recipeId, servings) {
     ts: Date.now()
   }
   state.logs.push(entry)
-  addLog(entry)
+  persist(addLog(entry))
 }
 
 function logIngredient(ingId, grams) {
@@ -2854,7 +2863,7 @@ function logIngredient(ingId, grams) {
     ts: Date.now()
   }
   state.logs.push(entry)
-  addLog(entry)
+  persist(addLog(entry))
 }
 
 // Click outside modal
