@@ -1288,7 +1288,7 @@ function ingredientForm(editId) {
   if (editingIdx !== null) {
     h += '<button type="button" class="btn small" data-action="cancel-portion-edit" title="Annuler la modification" aria-label="Annuler la modification">' + iconClose + '</button>'
   }
-  h += '<button type="button" class="btn small primary" data-action="add-portion" title="Enregistrer la portion" aria-label="Enregistrer la portion">' + iconCheck + '</button>'
+  h += '<button type="button" class="btn small" data-action="add-portion" title="Enregistrer la portion" aria-label="Enregistrer la portion">' + iconCheck + '</button>'
   h += '</div>'
   h += '</div>'
 
