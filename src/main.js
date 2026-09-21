@@ -968,7 +968,11 @@ function recipeDetailBody(recipeId) {
     h += '</div></div>'
     r.items.forEach((it, idx) => {
       const ing = state.ingredients.find(i => i.id === it.ingredient_id)
-      h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-body);padding:6px 0;' + (idx < r.items.length - 1 ? 'border-bottom:1px solid var(--border);' : '') + '"><div>' + (ing ? esc(ing.name) : 'Ingrédient supprimé') + '</div><div style="font-weight:500;">' + round(it.grams * factor, 1) + ' ' + (ing && ing.unit ? esc(ing.unit) : 'g') + '</div></div>'
+      h += '<div style="display:flex;align-items:center;gap:12px;font-size:var(--text-body);padding:8px 0;' + (idx < r.items.length - 1 ? 'border-bottom:1px solid var(--border);' : '') + '">'
+      h += '<div style="width:44px;height:44px;flex-shrink:0;border-radius:8px;overflow:hidden;background:var(--surface);border:1px solid var(--border);">' + ingThumbHtml(ing || {}, '100%', '20px') + '</div>'
+      h += '<div style="flex:1;min-width:0;">' + (ing ? esc(ing.name) : 'Ingrédient supprimé') + '</div>'
+      h += '<div style="font-weight:500;flex-shrink:0;">' + round(it.grams * factor, 1) + ' ' + (ing && ing.unit ? esc(ing.unit) : 'g') + '</div>'
+      h += '</div>'
     })
     h += '</div>'
   }
@@ -1724,9 +1728,9 @@ function ingredientDetailBody(ingId) {
 
   const hasBrand = ing.brands && ing.brands.length > 0
   h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (hasBrand ? '4px' : '14px') + ';">'
-  h += '<div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">'
-  h += '<h2 style="margin:0;">' + esc(ing.name) + '</h2>'
-  h += '<button data-action="toggle-favorite" data-id="' + ing.id + '" style="background:none;border:none;cursor:pointer;font-size:22px;line-height:1;padding:2px;flex-shrink:0;color:' + (ing.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (ing.is_favorite ? '★' : '☆') + '</button>'
+  // L'étoile suit directement la dernière ligne du nom, même quand il passe sur deux lignes
+  h += '<div style="flex:1;min-width:0;">'
+  h += '<h2 style="margin:0;font-size:var(--text-h1);">' + esc(ing.name) + ' <button data-action="toggle-favorite" data-id="' + ing.id + '" style="background:none;border:none;cursor:pointer;font-size:28px;line-height:1;padding:0 2px;vertical-align:middle;color:' + (ing.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (ing.is_favorite ? '★' : '☆') + '</button></h2>'
   h += '</div>'
   if (ing.category) {
     h += '<div style="flex-shrink:0;color:var(--text-muted);font-size:var(--text-small);font-weight:500;">' + esc(ing.category) + '</div>'
@@ -1737,7 +1741,7 @@ function ingredientDetailBody(ingId) {
 
   // Marque
   if (hasBrand) {
-    h += '<div style="color:var(--text-muted);font-size:var(--text-small);margin-bottom:16px;">' + ing.brands.join(', ') + '</div>'
+    h += '<div style="color:var(--text-muted);font-size:var(--text-body);margin-bottom:16px;">' + esc(ing.brands.join(', ')) + '</div>'
   }
 
   // Toggle 100g / portion(s)
@@ -1747,43 +1751,43 @@ function ingredientDetailBody(ingId) {
 
   if (portions.length > 0) {
     h += '<div class="segmented" style="margin-bottom:12px;flex-wrap:wrap;">'
-    h += '<button type="button" class="' + (!activePortion ? 'active' : '') + '" data-action="set-ing-detail-portion" data-idx="-1">Pour 100 ' + ingUnit + '</button>'
+    h += '<button type="button" style="font-size:var(--text-body);" class="' + (!activePortion ? 'active' : '') + '" data-action="set-ing-detail-portion" data-idx="-1">Pour 100 ' + ingUnit + '</button>'
     portions.forEach((p, idx) => {
-      h += '<button type="button" class="' + (state._ingDetailPortionIdx === idx ? 'active' : '') + '" data-action="set-ing-detail-portion" data-idx="' + idx + '">' + esc(p.name) + '</button>'
+      h += '<button type="button" style="font-size:var(--text-body);" class="' + (state._ingDetailPortionIdx === idx ? 'active' : '') + '" data-action="set-ing-detail-portion" data-idx="' + idx + '">' + esc(p.name) + '</button>'
     })
     h += '</div>'
   }
 
   // Macros en listing (style étiquette)
   h += '<div class="card" style="background:var(--surface-raised);padding:14px;margin-bottom:16px;">'
-  h += '<div style="font-size:var(--text-caption);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Valeurs nutritionnelles ' + (activePortion ? 'pour ' + esc(activePortion.name) + ' (' + activePortion.grams + 'g)' : 'pour 100 ' + ingUnit) + '</div>'
+  h += '<div style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Valeurs nutritionnelles ' + (activePortion ? 'pour ' + esc(activePortion.name) + ' (' + activePortion.grams + 'g)' : 'pour 100 ' + ingUnit) + '</div>'
 
   // Ligne principale : kcal
   h += '<div style="border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:10px;">'
   h += '<div style="display:flex;justify-content:space-between;align-items:center;">'
-  h += '<div style="font-size:var(--text-small);">Énergie</div>'
-  h += '<div style="font-size:var(--text-h2);font-weight:700;">' + round(ing.kcal * factor) + ' <span style="font-size:var(--text-small);">kcal</span></div>'
+  h += '<div style="font-size:var(--text-body);">Énergie</div>'
+  h += '<div style="font-size:var(--text-h1);font-weight:700;">' + round(ing.kcal * factor) + ' <span style="font-size:var(--text-body);">kcal</span></div>'
   h += '</div></div>'
 
   // Macros principales
   h += '<div style="display:flex;flex-direction:column;gap:10px;">'
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Protéines</div><div style="font-weight:600;color:var(--protein);font-size:var(--text-h3);">' + round(ing.protein * factor) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Glucides</div><div style="font-weight:600;color:var(--carbs);font-size:var(--text-h3);">' + round(ing.carbs * factor) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-small);">Lipides</div><div style="font-weight:600;color:var(--fat);font-size:var(--text-h3);">' + round(ing.fat * factor) + ' <span style="font-size:var(--text-caption);color:var(--text-muted);font-weight:400;">g</span></div></div>'
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-body);">Protéines</div><div style="font-weight:600;color:var(--protein);font-size:var(--text-h2);">' + round(ing.protein * factor) + ' <span style="font-size:var(--text-small);color:var(--text-muted);font-weight:400;">g</span></div></div>'
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-body);">Glucides</div><div style="font-weight:600;color:var(--carbs);font-size:var(--text-h2);">' + round(ing.carbs * factor) + ' <span style="font-size:var(--text-small);color:var(--text-muted);font-weight:400;">g</span></div></div>'
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-body);">Lipides</div><div style="font-weight:600;color:var(--fat);font-size:var(--text-h2);">' + round(ing.fat * factor) + ' <span style="font-size:var(--text-small);color:var(--text-muted);font-weight:400;">g</span></div></div>'
 
   // Détails supplémentaires
   if (ing.saturated_fat || ing.fiber || ing.sugar || ing.salt) {
     h += '<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px;">'
-    if (ing.saturated_fat) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);margin-bottom:6px;"><div>Acides gras saturés</div><div style="font-weight:500;">' + round(ing.saturated_fat * factor) + ' g</div></div>'
-    if (ing.sugar) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);margin-bottom:6px;"><div>Sucres</div><div style="font-weight:500;">' + round(ing.sugar * factor) + ' g</div></div>'
-    if (ing.fiber) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);margin-bottom:6px;"><div>Fibres</div><div style="font-weight:500;">' + round(ing.fiber * factor) + ' g</div></div>'
-    if (ing.salt) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-small);"><div>Sel</div><div style="font-weight:500;">' + round(ing.salt * factor) + ' g</div></div>'
+    if (ing.saturated_fat) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-body);margin-bottom:6px;"><div>Acides gras saturés</div><div style="font-weight:500;">' + round(ing.saturated_fat * factor) + ' g</div></div>'
+    if (ing.sugar) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-body);margin-bottom:6px;"><div>Sucres</div><div style="font-weight:500;">' + round(ing.sugar * factor) + ' g</div></div>'
+    if (ing.fiber) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-body);margin-bottom:6px;"><div>Fibres</div><div style="font-weight:500;">' + round(ing.fiber * factor) + ' g</div></div>'
+    if (ing.salt) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-body);"><div>Sel</div><div style="font-weight:500;">' + round(ing.salt * factor) + ' g</div></div>'
     h += '</div>'
   }
 
   h += '</div></div>'
 
-  h += detailActionsHtml('edit-ing', 'del-ing', ing.id, 'l\'ingrédient')
+  h += detailActionsHtml('edit-ing', 'del-ing', ing.id, 'l\'ingrédient', true)
 
   return h
 }
