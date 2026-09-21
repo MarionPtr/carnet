@@ -1358,7 +1358,7 @@ function recipeForm(editId) {
   h += '<div style="flex:1;min-width:0;">' + withPaste('<input type="text" id="rf-photo-url" class="input-sm" value="' + esc(draft.photo) + '" placeholder="Colle un lien URL d\'image"/>', 'rf-photo-url') + '</div>'
   h += '</div></div>'
 
-  h += '<label class="field"><span class="lbl">Nom</span><input id="rf-name" value="' + esc(draft.name) + '"/></label>'
+  h += '<label class="field"><span class="lbl">Nom <span style="color:var(--danger);">*</span></span><input id="rf-name" value="' + esc(draft.name) + '"/></label>'
 
   h += '<label class="field"><span class="lbl">Type <span style="color:var(--danger);">*</span></span><select id="rf-type">'
   h += '<option value="">Sélectionner un type</option>'
@@ -1422,9 +1422,9 @@ function recipeForm(editId) {
 
   h += '<label class="field"><span class="lbl">Instructions</span><textarea id="rf-instructions" rows="6" placeholder="Étapes de la recette…" style="resize:vertical;">' + esc(draft.instructions) + '</textarea></label>'
 
-  const typeChosen = !!draft.type && (draft.type !== '__new__' || !!(draft.newType || '').trim())
-  h += '<button class="btn primary block" id="save-recipe-btn" data-action="save-recipe" data-id="' + (editId || '') + '"' + (typeChosen ? '' : ' disabled') + '>Enregistrer la recette</button>'
-  h += '<div id="save-recipe-hint" style="text-align:center;color:var(--text-muted);font-size:var(--text-small);margin-top:8px;' + (typeChosen ? 'display:none;' : '') + '">Choisis un type de recette pour pouvoir enregistrer.</div>'
+  const saveHint = recipeSaveHint(draft)
+  h += '<button class="btn primary block" id="save-recipe-btn" data-action="save-recipe" data-id="' + (editId || '') + '"' + (saveHint ? ' disabled' : '') + '>Enregistrer la recette</button>'
+  h += '<div id="save-recipe-hint" style="text-align:center;color:var(--text-muted);font-size:var(--text-small);margin-top:8px;' + (saveHint ? '' : 'display:none;') + '">' + esc(saveHint) + '</div>'
   return h
 }
 
@@ -1902,15 +1902,31 @@ function persist(promise) {
   })
 }
 
-// « Enregistrer la recette » reste grisé tant qu'aucun type n'est choisi
+// Ce qui manque pour pouvoir enregistrer une recette : le nom et le type sont obligatoires
+function recipeMissingFields(d) {
+  const missing = []
+  if (!(d.name || '').trim()) missing.push('le nom')
+  if (!d.type || (d.type === '__new__' && !(d.newType || '').trim())) missing.push('le type')
+  return missing
+}
+
+function recipeSaveHint(d) {
+  const missing = recipeMissingFields(d)
+  return missing.length ? 'Renseigne ' + missing.join(' et ') + ' de la recette pour pouvoir enregistrer.' : ''
+}
+
+// « Enregistrer la recette » reste grisé tant que le nom ou le type manque
 function updateRecipeSaveState() {
   const d = state._draftRecipe
   const btn = document.getElementById('save-recipe-btn')
   const hint = document.getElementById('save-recipe-hint')
   if (!d || !btn) return
-  const ok = !!d.type && (d.type !== '__new__' || !!(d.newType || '').trim())
-  btn.disabled = !ok
-  if (hint) hint.style.display = ok ? 'none' : 'block'
+  const text = recipeSaveHint(d)
+  btn.disabled = !!text
+  if (hint) {
+    hint.textContent = text
+    hint.style.display = text ? 'block' : 'none'
+  }
 }
 
 function bindEvents() {
@@ -2155,6 +2171,7 @@ function bindEvents() {
     rfName.addEventListener('input', () => {
       if (!state._draftRecipe) return
       state._draftRecipe.name = rfName.value
+      updateRecipeSaveState()
     })
   }
   const rfReferenceUrl = document.getElementById('rf-reference-url')
