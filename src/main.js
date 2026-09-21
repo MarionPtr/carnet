@@ -1269,7 +1269,7 @@ function ingredientForm(editId) {
     draft.portions.forEach((p, idx) => {
       const isEditing = editingIdx === idx
       h += '<div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">'
-      h += '<span style="flex:1;min-width:0;padding:8px;background:var(--surface-raised);border-radius:6px;font-size:var(--text-small);border:1px solid ' + (isEditing ? 'var(--protein)' : 'transparent') + ';">' + esc(p.name) + ' (' + p.grams + 'g)</span>'
+      h += '<span style="flex:1;min-width:0;padding:8px 10px;background:var(--surface-raised);border-radius:6px;font-size:var(--text-body);border:1px solid ' + (isEditing ? 'var(--protein)' : 'transparent') + ';">' + esc(p.name) + ' (' + p.grams + 'g)</span>'
       h += '<button type="button" class="icon-btn" data-action="edit-portion" data-idx="' + idx + '" title="Modifier la portion" aria-label="Modifier la portion" style="display:flex;padding:6px;">' + iconPencil + '</button>'
       h += '<button type="button" class="icon-btn" data-action="rm-portion" data-idx="' + idx + '" title="Supprimer la portion" aria-label="Supprimer la portion">✕</button>'
       h += '</div>'
