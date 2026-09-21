@@ -1377,7 +1377,46 @@ function recipeItemKcal(it) {
   return ing ? round(ing.kcal * (it.grams || 0) / 100) : 0
 }
 
-function recipeTotalsText(draft) {
+// Résumé nutritionnel : anneau des calories à gauche, pourcentage / grammes / nom de chaque macro à droite
+function macroSummaryHtml(kcal, protein, carbs, fat) {
+  const kp = protein * 4
+  const kc = carbs * 4
+  const kf = fat * 9
+  const total = kp + kc + kf
+  const R = 34
+  const C = 2 * Math.PI * R
+  let ring = '<svg width="92" height="92" viewBox="0 0 84 84" aria-hidden="true"><circle cx="42" cy="42" r="' + R + '" fill="none" stroke="var(--track-bg)" stroke-width="9"/>'
+  if (total > 0) {
+    let offset = 0
+    ;[[kp, 'var(--protein)'], [kc, 'var(--carbs)'], [kf, 'var(--fat)']].forEach(([part, color]) => {
+      const len = Math.max(0, (part / total) * C - 1.5)
+      if (part > 0) {
+        ring += '<circle cx="42" cy="42" r="' + R + '" fill="none" stroke="' + color + '" stroke-width="9" stroke-dasharray="' + len + ' ' + (C - len) + '" stroke-dashoffset="' + (-offset) + '" transform="rotate(-90 42 42)"/>'
+      }
+      offset += (part / total) * C
+    })
+  }
+  ring += '</svg>'
+  const share = part => (total > 0 ? Math.round((part / total) * 100) : 0)
+  const col = (color, pct, grams, label) =>
+    '<div style="flex:1;text-align:center;min-width:0;">'
+    + '<div style="font-size:var(--text-small);font-weight:600;color:' + color + ';">' + pct + '%</div>'
+    + '<div style="font-size:var(--text-h2);font-weight:600;line-height:1.3;">' + round(grams) + ' <span style="font-size:var(--text-small);font-weight:400;color:var(--text-muted);">g</span></div>'
+    + '<div style="font-size:var(--text-small);color:var(--text-muted);">' + label + '</div></div>'
+  let h = '<div style="display:flex;align-items:center;gap:12px;">'
+  h += '<div style="position:relative;width:92px;height:92px;flex-shrink:0;">' + ring
+  h += '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">'
+  h += '<div style="font-size:var(--text-h2);font-weight:700;line-height:1.1;">' + round(kcal) + '</div>'
+  h += '<div style="font-size:var(--text-small);color:var(--text-muted);">kcal</div></div></div>'
+  h += '<div style="flex:1;display:flex;gap:4px;min-width:0;">'
+  h += col('var(--protein)', share(kp), protein, 'Protéines')
+  h += col('var(--carbs)', share(kc), carbs, 'Glucides')
+  h += col('var(--fat)', share(kf), fat, 'Lipides')
+  h += '</div></div>'
+  return h
+}
+
+function recipeTotalsHtml(draft) {
   const totals = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
   draft.items.forEach(it => {
     const ing = state.ingredients.find(i => i.id === it.ingredient_id)
@@ -1390,7 +1429,8 @@ function recipeTotalsText(draft) {
     }
   })
   const n = Math.max(1, parseInt(draft.servings) || 1)
-  return 'Par portion : ' + round(totals.kcal / n) + ' kcal · P ' + round(totals.protein / n) + 'g · G ' + round(totals.carbs / n) + 'g · L ' + round(totals.fat / n) + 'g'
+  return '<div style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Par portion</div>'
+    + macroSummaryHtml(totals.kcal / n, totals.protein / n, totals.carbs / n, totals.fat / n)
 }
 
 function recipeItemCardHtml(it, idx) {
@@ -1514,7 +1554,7 @@ function recipeForm(editId) {
   }
 
   if (draft.items.length > 0) {
-    h += '<div class="card" style="background:var(--surface-raised);margin-bottom:14px;"><div class="sub" id="rf-totals">' + recipeTotalsText(draft) + '</div></div>'
+    h += '<div class="card" style="background:var(--surface-raised);margin-bottom:14px;"><div id="rf-totals">' + recipeTotalsHtml(draft) + '</div></div>'
   }
 
   h += '<label class="field"><span class="lbl">Instructions</span><textarea id="rf-instructions" rows="6" placeholder="Étapes de la recette…" style="resize:vertical;">' + esc(draft.instructions) + '</textarea></label>'
@@ -2185,7 +2225,7 @@ function bindEvents() {
       const kcal = document.getElementById('ri-kcal-' + idx)
       if (kcal) kcal.textContent = recipeItemKcal(it) + ' kcal pour cette ligne'
       const totals = document.getElementById('rf-totals')
-      if (totals) totals.textContent = recipeTotalsText(state._draftRecipe)
+      if (totals) totals.innerHTML = recipeTotalsHtml(state._draftRecipe)
     })
   })
 
