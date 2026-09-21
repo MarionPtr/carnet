@@ -114,6 +114,16 @@ input:focus, select:focus, textarea:focus{ outline:none; border-color:var(--prot
 label.field{ display:block; margin-bottom:10px; }
 label.field .lbl{ display:block; font-size:var(--text-small); color:var(--text-muted); margin-bottom:5px; }
 .row2{ display:flex; gap:8px; }
+
+/* Champ + bouton « Coller » */
+.paste-row{ display:flex; gap:6px; align-items:stretch; }
+.paste-row input{ flex:1; min-width:0; }
+.paste-btn{
+  flex-shrink:0; width:44px; display:flex; align-items:center; justify-content:center;
+  background:var(--surface-raised); color:var(--text-muted);
+  border:1px solid var(--border-strong); border-radius:9px; padding:0;
+}
+.paste-btn:active{ transform:scale(0.96); color:var(--text); }
 .row2 > *{ flex:1; min-width:0; }
 
 /* iOS Safari : le champ date natif garde une largeur/hauteur intrinsèques et centre son texte */

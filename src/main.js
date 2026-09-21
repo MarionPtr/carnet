@@ -1171,6 +1171,49 @@ function renderModal() {
   )
 }
 
+// Champ de saisie accompagné d'un bouton « Coller » (remplace la valeur par le contenu du presse-papiers)
+const PASTE_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>'
+
+function pasteButtonHtml(targetId) {
+  return '<button type="button" class="paste-btn" data-action="paste-field" data-target="' + targetId + '" title="Coller" aria-label="Coller">' + PASTE_ICON + '</button>'
+}
+
+function withPaste(inputHtml, targetId) {
+  return '<div class="paste-row">' + inputHtml + pasteButtonHtml(targetId) + '</div>'
+}
+
+async function pasteIntoField(targetId) {
+  const input = document.getElementById(targetId)
+  if (!input) return
+  let text = ''
+  try {
+    text = await navigator.clipboard.readText()
+  } catch (e) {
+    // Accès refusé par le navigateur : on sélectionne le champ pour un collage manuel
+    input.focus()
+    input.select()
+    showToast('Accès au presse-papiers refusé. Le champ est sélectionné : colle avec ⌘V, ou appui long puis Coller.')
+    return
+  }
+  text = (text || '').replace(/\u00a0/g, ' ').trim()
+  if (!text) {
+    showToast('Le presse-papiers est vide')
+    return
+  }
+  if (input.type === 'number') {
+    const match = text.match(/-?\d{1,3}(?: \d{3})+(?:[.,]\d+)?|-?\d+(?:[.,]\d+)?/)
+    if (!match) {
+      showToast('Aucun nombre dans le texte copié')
+      return
+    }
+    input.value = match[0].replace(/ /g, '').replace(',', '.')
+  } else {
+    input.value = text.replace(/\s+/g, ' ')
+  }
+  // Déclenche les écouteurs existants (aperçu de la photo, validation du nom...)
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
 function ingredientForm(editId) {
   const ing = editId
     ? state.ingredients.find(i => i.id === editId)
@@ -1194,12 +1237,12 @@ function ingredientForm(editId) {
   }
   h += '</div>'
   h += '<div style="flex:1;">'
-  h += '<input type="text" id="f-photo-url" placeholder="Colle un lien URL d\'image" value="' + esc(draft.photo || '') + '" style="width:100%;"/>'
+  h += withPaste('<input type="text" id="f-photo-url" placeholder="Colle un lien URL d\'image" value="' + esc(draft.photo || '') + '"/>', 'f-photo-url')
   h += '</div>'
   h += '</div>'
   h += '</label>'
 
-  h += '<label class="field"><span class="lbl">Nom</span><input id="f-name" value="' + esc(draft.name) + '" placeholder="ex. Blanc de poulet"/></label>'
+  h += '<label class="field"><span class="lbl">Nom</span>' + withPaste('<input id="f-name" value="' + esc(draft.name) + '" placeholder="ex. Blanc de poulet"/>', 'f-name') + '</label>'
 
   h += '<label class="field"><span class="lbl">Catégorie</span><select id="f-category">'
   h += '<option value="">Sélectionner une catégorie</option>'
@@ -1218,7 +1261,7 @@ function ingredientForm(editId) {
     })
   }
   h += '</div>'
-  h += '<div style="display:flex;gap:6px;"><input id="f-brand-input" placeholder="Ajouter une marque" style="flex:1;"/><button class="btn small" data-action="add-brand">+</button></div>'
+  h += '<div style="display:flex;gap:6px;"><input id="f-brand-input" placeholder="Ajouter une marque" style="flex:1;min-width:0;"/>' + pasteButtonHtml('f-brand-input') + '<button class="btn small" data-action="add-brand">+</button></div>'
   h += '</label>'
 
   h += '<label class="field"><span class="lbl">Portions</span>'
@@ -1249,20 +1292,20 @@ function ingredientForm(editId) {
   h += '</div>'
   h += '</label>'
 
-  h += '<label class="field"><span class="lbl">Calories (kcal)</span><input type="number" id="f-kcal" value="' + (draft.kcal || '') + '"/></label>'
+  h += '<label class="field"><span class="lbl">Calories (kcal)</span>' + withPaste('<input type="number" id="f-kcal" value="' + (draft.kcal || '') + '"/>', 'f-kcal') + '</label>'
   h += '<div class="row2">'
-  h += '<label class="field"><span class="lbl">Lipides (g)</span><input type="number" id="f-fat" value="' + (draft.fat || '') + '"/></label>'
-  h += '<label class="field"><span class="lbl">dont acides gras saturés (g)</span><input type="number" id="f-saturated-fat" value="' + (draft.saturated_fat || '') + '"/></label>'
+  h += '<label class="field"><span class="lbl">Lipides (g)</span>' + withPaste('<input type="number" id="f-fat" value="' + (draft.fat || '') + '"/>', 'f-fat') + '</label>'
+  h += '<label class="field"><span class="lbl">dont acides gras saturés (g)</span>' + withPaste('<input type="number" id="f-saturated-fat" value="' + (draft.saturated_fat || '') + '"/>', 'f-saturated-fat') + '</label>'
   h += '</div>'
   h += '<div class="row2">'
-  h += '<label class="field"><span class="lbl">Glucides (g)</span><input type="number" id="f-carbs" value="' + (draft.carbs || '') + '"/></label>'
-  h += '<label class="field"><span class="lbl">dont sucres (g)</span><input type="number" id="f-sugar" value="' + (draft.sugar || '') + '"/></label>'
+  h += '<label class="field"><span class="lbl">Glucides (g)</span>' + withPaste('<input type="number" id="f-carbs" value="' + (draft.carbs || '') + '"/>', 'f-carbs') + '</label>'
+  h += '<label class="field"><span class="lbl">dont sucres (g)</span>' + withPaste('<input type="number" id="f-sugar" value="' + (draft.sugar || '') + '"/>', 'f-sugar') + '</label>'
   h += '</div>'
   h += '<div class="row2">'
-  h += '<label class="field"><span class="lbl">Protéines (g)</span><input type="number" id="f-protein" value="' + (draft.protein || '') + '"/></label>'
-  h += '<label class="field"><span class="lbl">Fibres (g)</span><input type="number" id="f-fiber" value="' + (draft.fiber || '') + '"/></label>'
+  h += '<label class="field"><span class="lbl">Protéines (g)</span>' + withPaste('<input type="number" id="f-protein" value="' + (draft.protein || '') + '"/>', 'f-protein') + '</label>'
+  h += '<label class="field"><span class="lbl">Fibres (g)</span>' + withPaste('<input type="number" id="f-fiber" value="' + (draft.fiber || '') + '"/>', 'f-fiber') + '</label>'
   h += '</div>'
-  h += '<label class="field"><span class="lbl">Sel (g)</span><input type="number" id="f-salt" value="' + (draft.salt || '') + '"/></label>'
+  h += '<label class="field"><span class="lbl">Sel (g)</span>' + withPaste('<input type="number" id="f-salt" value="' + (draft.salt || '') + '"/>', 'f-salt') + '</label>'
 
   h += '<button class="btn primary block" id="save-ing-btn" data-action="save-ing" data-id="' + (editId || '') + '">Enregistrer</button>'
   return h
@@ -1936,6 +1979,21 @@ function bindEvents() {
     nameInput.addEventListener('input', updateButtonState)
   }
 
+  // Le brouillon garde les valeurs saisies ou collées : elles survivent à un nouvel affichage du formulaire
+  // (message, changement d'unité, ajout d'une marque...)
+  const ingDraftFields = {
+    'f-name': 'name', 'f-kcal': 'kcal', 'f-fat': 'fat', 'f-saturated-fat': 'saturated_fat',
+    'f-carbs': 'carbs', 'f-sugar': 'sugar', 'f-protein': 'protein', 'f-fiber': 'fiber', 'f-salt': 'salt'
+  }
+  Object.keys(ingDraftFields).forEach(id => {
+    const field = document.getElementById(id)
+    if (!field) return
+    field.addEventListener('input', () => {
+      if (!state._draftIngredient) state._draftIngredient = {}
+      state._draftIngredient[ingDraftFields[id]] = field.value
+    })
+  })
+
   updateButtonState()
 
   // Photo URL field - update preview live
@@ -2247,6 +2305,8 @@ function handleAction(action, el) {
       setRecipeFavorite(recipe.id, recipe.is_favorite)
       render()
     }
+  } else if (action === 'paste-field') {
+    pasteIntoField(el.getAttribute('data-target'))
   } else if (action === 'set-ing-unit') {
     if (!state._draftIngredient) state._draftIngredient = {}
     state._draftIngredient.unit = el.getAttribute('data-unit')
