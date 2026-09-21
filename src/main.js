@@ -1719,12 +1719,6 @@ function ingredientDetailBody(ingId) {
 
   const portions = getIngredientPortions(ing)
 
-  // Serving size
-  if (portions.length > 0) {
-    const label = 'Portion' + (portions.length > 1 ? 's' : '') + ' : ' + portions.map(p => esc(p.name) + ' (' + p.grams + 'g)').join(' · ')
-    h += '<div style="color:var(--text-muted);font-size:var(--text-small);margin-bottom:12px;font-weight:500;">' + label + '</div>'
-  }
-
   // Category + Brands
   if (ing.category) {
     h += '<div style="display:inline-block;padding:4px 10px;background:var(--protein);color:#221705;border-radius:6px;font-size:var(--text-caption);font-weight:600;margin-bottom:12px;">' + esc(ing.category) + '</div>'
