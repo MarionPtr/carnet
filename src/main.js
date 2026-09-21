@@ -1226,6 +1226,34 @@ async function pasteIntoField(targetId) {
   input.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
+// Champs obligatoires d'un ingrédient (les fibres, le sel, la marque, la photo et les portions restent facultatifs)
+const INGREDIENT_REQUIRED_FIELDS = [
+  ['f-name', 'nom'], ['f-category', 'catégorie'], ['f-kcal', 'calories'], ['f-fat', 'lipides'],
+  ['f-saturated-fat', 'acides gras saturés'], ['f-carbs', 'glucides'], ['f-sugar', 'sucres'], ['f-protein', 'protéines']
+]
+
+function numField(v) {
+  return v === undefined || v === null || v === '' ? '' : String(v)
+}
+
+// Liste (d'après ce qui est affiché dans le formulaire) des champs obligatoires encore vides
+function ingredientMissingFields() {
+  return INGREDIENT_REQUIRED_FIELDS.filter(([id]) => {
+    const el = document.getElementById(id)
+    if (!el) return false
+    const value = (el.value || '').trim()
+    if (id === 'f-category') {
+      if (value === '') return true
+      if (value === '__new__') {
+        const fresh = document.getElementById('f-new-category')
+        return !fresh || !fresh.value.trim()
+      }
+      return false
+    }
+    return value === ''
+  }).map(([, label]) => label)
+}
+
 function ingredientForm(editId) {
   const ing = editId
     ? state.ingredients.find(i => i.id === editId)
@@ -1255,9 +1283,9 @@ function ingredientForm(editId) {
   h += '</div>'
   h += '</label>'
 
-  h += '<label class="field"><span class="lbl">Nom</span><input id="f-name" class="input-sm" value="' + esc(draft.name) + '" placeholder="ex. Blanc de poulet"/></label>'
+  h += '<label class="field"><span class="lbl">Nom <span style="color:var(--danger);">*</span></span><input id="f-name" class="input-sm" value="' + esc(draft.name) + '" placeholder="ex. Blanc de poulet"/></label>'
 
-  h += '<label class="field"><span class="lbl">Catégorie</span><select id="f-category">'
+  h += '<label class="field"><span class="lbl">Catégorie <span style="color:var(--danger);">*</span></span><select id="f-category">'
   h += '<option value="">Sélectionner une catégorie</option>'
   state.categories.forEach(cat => {
     h += '<option value="' + cat + '" ' + (draft.category === cat ? 'selected' : '') + '>' + cat + '</option>'
@@ -1306,23 +1334,24 @@ function ingredientForm(editId) {
   h += '<button type="button" class="' + (unit === 'ml' ? 'active' : '') + '" data-action="set-ing-unit" data-unit="ml">ml</button>'
   h += '</div></div>'
 
-  h += '<label class="field"><span class="lbl">Calories (kcal)</span>' + '<input type="number" id="f-kcal" value="' + (draft.kcal || '') + '"/>' + '</label>'
+  h += '<label class="field"><span class="lbl">Calories (kcal) <span style="color:var(--danger);">*</span></span>' + '<input type="number" id="f-kcal" value="' + numField(draft.kcal) + '"/>' + '</label>'
   h += '<div class="row2">'
-  h += '<label class="field"><span class="lbl">Lipides (g)</span>' + '<input type="number" id="f-fat" value="' + (draft.fat || '') + '"/>' + '</label>'
-  h += '<label class="field"><span class="lbl">dont acides gras saturés (g)</span>' + '<input type="number" id="f-saturated-fat" value="' + (draft.saturated_fat || '') + '"/>' + '</label>'
+  h += '<label class="field"><span class="lbl">Lipides (g) <span style="color:var(--danger);">*</span></span>' + '<input type="number" id="f-fat" value="' + numField(draft.fat) + '"/>' + '</label>'
+  h += '<label class="field"><span class="lbl">dont acides gras saturés (g) <span style="color:var(--danger);">*</span></span>' + '<input type="number" id="f-saturated-fat" value="' + numField(draft.saturated_fat) + '"/>' + '</label>'
   h += '</div>'
   h += '<div class="row2">'
-  h += '<label class="field"><span class="lbl">Glucides (g)</span>' + '<input type="number" id="f-carbs" value="' + (draft.carbs || '') + '"/>' + '</label>'
-  h += '<label class="field"><span class="lbl">dont sucres (g)</span>' + '<input type="number" id="f-sugar" value="' + (draft.sugar || '') + '"/>' + '</label>'
+  h += '<label class="field"><span class="lbl">Glucides (g) <span style="color:var(--danger);">*</span></span>' + '<input type="number" id="f-carbs" value="' + numField(draft.carbs) + '"/>' + '</label>'
+  h += '<label class="field"><span class="lbl">dont sucres (g) <span style="color:var(--danger);">*</span></span>' + '<input type="number" id="f-sugar" value="' + numField(draft.sugar) + '"/>' + '</label>'
   h += '</div>'
   h += '<div class="row2">'
-  h += '<label class="field"><span class="lbl">Protéines (g)</span>' + '<input type="number" id="f-protein" value="' + (draft.protein || '') + '"/>' + '</label>'
-  h += '<label class="field"><span class="lbl">Fibres (g)</span>' + '<input type="number" id="f-fiber" value="' + (draft.fiber || '') + '"/>' + '</label>'
+  h += '<label class="field"><span class="lbl">Protéines (g) <span style="color:var(--danger);">*</span></span>' + '<input type="number" id="f-protein" value="' + numField(draft.protein) + '"/>' + '</label>'
+  h += '<label class="field"><span class="lbl">Fibres (g)</span>' + '<input type="number" id="f-fiber" value="' + numField(draft.fiber) + '"/>' + '</label>'
   h += '</div>'
-  h += '<label class="field"><span class="lbl">Sel (g)</span>' + '<input type="number" id="f-salt" value="' + (draft.salt || '') + '"/>' + '</label>'
+  h += '<label class="field"><span class="lbl">Sel (g)</span>' + '<input type="number" id="f-salt" value="' + numField(draft.salt) + '"/>' + '</label>'
 
   const iconSave = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>'
   h += '<button class="btn primary block" id="save-ing-btn" data-action="save-ing" data-id="' + (editId || '') + '" style="display:flex;align-items:center;justify-content:center;gap:8px;">' + iconSave + '<span>Enregistrer</span></button>'
+  h += '<div id="save-ing-hint" style="text-align:center;color:var(--text-muted);font-size:var(--text-small);margin-top:8px;display:none;"></div>'
   return h
 }
 
@@ -2105,14 +2134,17 @@ function bindEvents() {
   const nameInput = document.getElementById('f-name')
   const saveBtn = document.getElementById('save-ing-btn')
 
+  const saveHint = document.getElementById('save-ing-hint')
   const updateButtonState = () => {
-    if (saveBtn && nameInput && catSelect) {
-      const name = nameInput.value.trim()
-      const cat = catSelect.value
-      const isValid = name.length > 0 && cat !== '' && cat !== '__new__'
-      saveBtn.disabled = !isValid
+    if (!saveBtn || !nameInput || !catSelect) return
+    const missing = ingredientMissingFields()
+    saveBtn.disabled = missing.length > 0
+    if (saveHint) {
+      saveHint.textContent = missing.length ? 'À renseigner pour enregistrer : ' + missing.join(', ') + '.' : ''
+      saveHint.style.display = missing.length ? 'block' : 'none'
     }
   }
+  if (newCatInput) newCatInput.addEventListener('input', updateButtonState)
 
   if (catSelect) {
     catSelect.addEventListener('change', () => {
@@ -2145,6 +2177,7 @@ function bindEvents() {
     field.addEventListener('input', () => {
       if (!state._draftIngredient) state._draftIngredient = {}
       state._draftIngredient[ingDraftFields[id]] = field.value
+      updateButtonState()
     })
   })
 
@@ -2628,6 +2661,11 @@ function handleAction(action, el) {
     render()
   } else if (action === 'save-ing') {
     const editId = el.getAttribute('data-id')
+    const missingFields = ingredientMissingFields()
+    if (missingFields.length) {
+      showToast('À renseigner : ' + missingFields.join(', '))
+      return
+    }
     const name = document.getElementById('f-name').value.trim()
     if (!name) {
       showToast('Donne un nom à l\'ingrédient')
