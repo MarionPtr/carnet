@@ -1175,7 +1175,7 @@ function renderModal() {
 const PASTE_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>'
 
 function pasteButtonHtml(targetId) {
-  return '<button type="button" class="paste-btn" data-action="paste-field" data-target="' + targetId + '" title="Coller" aria-label="Coller">' + PASTE_ICON + '</button>'
+  return '<button type="button" class="paste-btn" data-action="paste-field" data-target="' + targetId + '" title="Coller" aria-label="Coller" tabindex="-1" onmousedown="event.preventDefault()">' + PASTE_ICON + '</button>'
 }
 
 function withPaste(inputHtml, targetId) {
@@ -1192,7 +1192,8 @@ async function pasteIntoField(targetId) {
     // Accès refusé par le navigateur : on sélectionne le champ pour un collage manuel
     input.focus()
     input.select()
-    showToast('Accès au presse-papiers refusé. Le champ est sélectionné : colle avec ⌘V, ou appui long puis Coller.')
+    const reason = e && e.name ? ' (' + e.name + ')' : ''
+    showToast('Accès au presse-papiers refusé' + reason + '. Le champ est sélectionné : colle avec ⌘V, ou appui long puis Coller.', 5000)
     return
   }
   text = (text || '').replace(/\u00a0/g, ' ').trim()
