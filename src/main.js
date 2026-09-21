@@ -1250,12 +1250,12 @@ function ingredientForm(editId) {
   }
   h += '</div>'
   h += '<div style="flex:1;">'
-  h += withPaste('<input type="text" id="f-photo-url" placeholder="Colle un lien URL d\'image" value="' + esc(draft.photo || '') + '"/>', 'f-photo-url')
+  h += withPaste('<input type="text" id="f-photo-url" class="input-sm" placeholder="Colle un lien URL d\'image" value="' + esc(draft.photo || '') + '"/>', 'f-photo-url')
   h += '</div>'
   h += '</div>'
   h += '</label>'
 
-  h += '<label class="field"><span class="lbl">Nom</span><input id="f-name" value="' + esc(draft.name) + '" placeholder="ex. Blanc de poulet"/></label>'
+  h += '<label class="field"><span class="lbl">Nom</span><input id="f-name" class="input-sm" value="' + esc(draft.name) + '" placeholder="ex. Blanc de poulet"/></label>'
 
   h += '<label class="field"><span class="lbl">Catégorie</span><select id="f-category">'
   h += '<option value="">Sélectionner une catégorie</option>'
@@ -1267,7 +1267,7 @@ function ingredientForm(editId) {
   h += '<input id="f-new-category" type="text" placeholder="Nouvelle catégorie" style="display:none;margin-bottom:10px;"/>'
 
   const brandValue = draft.brand !== undefined ? draft.brand : ((draft.brands && draft.brands[0]) || '')
-  h += '<label class="field"><span class="lbl">Marque</span><input id="f-brand" value="' + esc(brandValue) + '" placeholder="ex. Danone"/></label>'
+  h += '<label class="field"><span class="lbl">Marque</span><input id="f-brand" class="input-sm" value="' + esc(brandValue) + '" placeholder="ex. Danone"/></label>'
 
   // Attention : <div> et non <label> ici, sinon un clic sur le texte d'une portion déclenche le premier bouton (supprimer)
   const editingIdx = draft.editingPortion !== undefined && draft.editingPortion !== null ? draft.editingPortion : null
@@ -1326,6 +1326,12 @@ function ingredientForm(editId) {
   return h
 }
 
+function recipePhotoPreviewHtml(photo) {
+  return photo
+    ? '<img src="' + esc(photo) + '" style="width:100%;height:100%;object-fit:cover;"/>'
+    : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h2);">📷</div>'
+}
+
 function recipeForm(editId) {
   if (!state._draftRecipe || state._draftRecipe.__for !== editId) {
     const r = editId
@@ -1346,9 +1352,15 @@ function recipeForm(editId) {
   const draft = state._draftRecipe
 
   let h = '<h2>' + (editId ? 'Modifier' : 'Nouvelle') + ' recette</h2>'
+  h += '<div class="field"><span class="lbl">Photo</span>'
+  h += '<div style="display:flex;gap:8px;align-items:flex-start;">'
+  h += '<div id="rf-photo-preview" style="width:80px;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--surface-raised);border:1px solid var(--border);flex-shrink:0;">' + recipePhotoPreviewHtml(draft.photo) + '</div>'
+  h += '<div style="flex:1;min-width:0;">' + withPaste('<input type="text" id="rf-photo-url" class="input-sm" value="' + esc(draft.photo) + '" placeholder="Colle un lien URL d\'image"/>', 'rf-photo-url') + '</div>'
+  h += '</div></div>'
+
   h += '<label class="field"><span class="lbl">Nom</span><input id="rf-name" value="' + esc(draft.name) + '"/></label>'
 
-  h += '<label class="field"><span class="lbl">Type</span><select id="rf-type">'
+  h += '<label class="field"><span class="lbl">Type <span style="color:var(--danger);">*</span></span><select id="rf-type">'
   h += '<option value="">Sélectionner un type</option>'
   state.recipeTypes.forEach(t => {
     h += '<option value="' + t + '" ' + (draft.type === t ? 'selected' : '') + '>' + t + '</option>'
@@ -1358,7 +1370,6 @@ function recipeForm(editId) {
   h += '<input id="rf-new-type" type="text" placeholder="Nouveau type" value="' + esc(draft.newType || '') + '" style="display:' + (draft.type === '__new__' ? 'block' : 'none') + ';margin-bottom:10px;"/>'
 
   h += '<label class="field"><span class="lbl">Lien de la recette de référence</span><input id="rf-reference-url" value="' + esc(draft.reference_url) + '" placeholder="https://…"/></label>'
-  h += '<label class="field"><span class="lbl">Lien de la photo</span><input id="rf-photo-url" value="' + esc(draft.photo) + '" placeholder="https://…"/></label>'
 
   const stepBtn = 'width:36px;height:36px;padding:0;line-height:1;border-radius:50%;background:var(--surface-raised);color:var(--text);border:1px solid var(--border-strong);font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;'
   h += '<span class="lbl" style="display:block;margin-bottom:6px;">Nombre de portions</span>'
@@ -1411,7 +1422,9 @@ function recipeForm(editId) {
 
   h += '<label class="field"><span class="lbl">Instructions</span><textarea id="rf-instructions" rows="6" placeholder="Étapes de la recette…" style="resize:vertical;">' + esc(draft.instructions) + '</textarea></label>'
 
-  h += '<button class="btn primary block" data-action="save-recipe" data-id="' + (editId || '') + '">Enregistrer la recette</button>'
+  const typeChosen = !!draft.type && (draft.type !== '__new__' || !!(draft.newType || '').trim())
+  h += '<button class="btn primary block" id="save-recipe-btn" data-action="save-recipe" data-id="' + (editId || '') + '"' + (typeChosen ? '' : ' disabled') + '>Enregistrer la recette</button>'
+  h += '<div id="save-recipe-hint" style="text-align:center;color:var(--text-muted);font-size:var(--text-small);margin-top:8px;' + (typeChosen ? 'display:none;' : '') + '">Choisis un type de recette pour pouvoir enregistrer.</div>'
   return h
 }
 
@@ -1889,6 +1902,17 @@ function persist(promise) {
   })
 }
 
+// « Enregistrer la recette » reste grisé tant qu'aucun type n'est choisi
+function updateRecipeSaveState() {
+  const d = state._draftRecipe
+  const btn = document.getElementById('save-recipe-btn')
+  const hint = document.getElementById('save-recipe-hint')
+  if (!d || !btn) return
+  const ok = !!d.type && (d.type !== '__new__' || !!(d.newType || '').trim())
+  btn.disabled = !ok
+  if (hint) hint.style.display = ok ? 'none' : 'block'
+}
+
 function bindEvents() {
   const app = document.getElementById('app')
 
@@ -2152,6 +2176,8 @@ function bindEvents() {
     rfPhotoUrl.addEventListener('input', () => {
       if (!state._draftRecipe) return
       state._draftRecipe.photo = rfPhotoUrl.value
+      const preview = document.getElementById('rf-photo-preview')
+      if (preview) preview.innerHTML = recipePhotoPreviewHtml(rfPhotoUrl.value.trim())
     })
   }
 
@@ -2168,11 +2194,13 @@ function bindEvents() {
       } else {
         rfNewTypeInput.style.display = 'none'
       }
+      updateRecipeSaveState()
     })
   }
   if (rfNewTypeInput) {
     rfNewTypeInput.addEventListener('input', () => {
       if (state._draftRecipe) state._draftRecipe.newType = rfNewTypeInput.value
+      updateRecipeSaveState()
     })
   }
 
@@ -2713,6 +2741,10 @@ function handleAction(action, el) {
     }
     const servings = Math.max(1, parseInt(draft.servings) || 1)
     let type = document.getElementById('rf-type').value
+    if (!type) {
+      showToast('Choisis un type de recette')
+      return
+    }
     if (type === '__new__') {
       type = document.getElementById('rf-new-type').value.trim()
       if (!type) {
