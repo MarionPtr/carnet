@@ -1719,7 +1719,7 @@ function ingredientDetailBody(ingId) {
   h += '<button data-action="toggle-favorite" data-id="' + ing.id + '" style="background:none;border:none;cursor:pointer;font-size:22px;line-height:1;padding:2px;flex-shrink:0;color:' + (ing.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (ing.is_favorite ? '★' : '☆') + '</button>'
   h += '</div>'
   if (ing.category) {
-    h += '<div style="flex-shrink:0;padding:4px 10px;background:var(--surface-raised);color:var(--text-muted);border:1px solid var(--border-strong);border-radius:6px;font-size:var(--text-caption);font-weight:600;">' + esc(ing.category) + '</div>'
+    h += '<div style="flex-shrink:0;color:var(--text-muted);font-size:var(--text-small);font-weight:500;">' + esc(ing.category) + '</div>'
   }
   h += '</div>'
 
