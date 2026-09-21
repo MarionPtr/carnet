@@ -389,8 +389,14 @@ function renderToday() {
         .slice()
         .reverse()
         .forEach(log => {
+          const logItem = log.kind === 'recipe'
+            ? state.recipes.find(r => r.id === log.ref_id)
+            : state.ingredients.find(i => i.id === log.ref_id)
           h += '<div class="list-item" style="padding-left:20px;">'
-          h += '<div><div class="name" style="font-size:var(--text-small);">' + esc(log.name) + '</div><div class="sub" style="font-size:var(--text-caption);">' + round(log.kcal) + ' kcal · ' + round(log.protein) + 'g P · ' + round(log.carbs) + 'g G · ' + round(log.fat) + 'g L</div></div>'
+          h += '<div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">'
+          h += '<div style="width:44px;height:44px;flex-shrink:0;border-radius:8px;overflow:hidden;background:var(--surface-raised);border:1px solid var(--border);">' + logThumbHtml(log.kind === 'recipe' ? 'recipe' : 'ingredient', logItem || {}) + '</div>'
+          h += '<div style="min-width:0;"><div class="name" style="font-size:var(--text-small);">' + esc(log.name) + '</div><div class="sub" style="font-size:var(--text-caption);">' + round(log.kcal) + ' kcal · ' + round(log.protein) + 'g P · ' + round(log.carbs) + 'g G · ' + round(log.fat) + 'g L</div></div>'
+          h += '</div>'
           h += '<div class="actions"><button class="icon-btn" data-action="del-log" data-id="' + log.id + '">✕</button></div>'
           h += '</div>'
         })
