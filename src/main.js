@@ -1221,7 +1221,8 @@ function ingredientForm(editId) {
     : { name: '', kcal: '', protein: '', carbs: '', fat: '', saturated_fat: '', fiber: '', sugar: '', salt: '', brands: [], photo: '', portions: [], unit: 'g' }
 
   if (!state._draftIngredient) {
-    state._draftIngredient = { ...ing, portions: getIngredientPortions(ing) }
+    // Copie des portions : le formulaire ne doit jamais modifier l'ingrédient affiché tant qu'on n'a pas enregistré
+    state._draftIngredient = { ...ing, portions: getIngredientPortions(ing).map(p => ({ ...p })) }
   }
   const draft = state._draftIngredient
 
@@ -1257,13 +1258,20 @@ function ingredientForm(editId) {
   const brandValue = draft.brand !== undefined ? draft.brand : ((draft.brands && draft.brands[0]) || '')
   h += '<label class="field"><span class="lbl">Marque</span><input id="f-brand" value="' + esc(brandValue) + '" placeholder="ex. Danone"/></label>'
 
-  h += '<label class="field"><span class="lbl">Portions</span>'
+  // Attention : <div> et non <label> ici, sinon un clic sur le texte d'une portion déclenche le premier bouton (supprimer)
+  const editingIdx = draft.editingPortion !== undefined && draft.editingPortion !== null ? draft.editingPortion : null
+  const iconPencil = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>'
+  const iconCheck = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12 10 18 20 6"/></svg>'
+  const iconClose = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>'
+  h += '<div class="field"><span class="lbl">Portions</span>'
   h += '<div style="margin-bottom:8px;">'
   if (draft.portions && draft.portions.length > 0) {
     draft.portions.forEach((p, idx) => {
+      const isEditing = editingIdx === idx
       h += '<div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">'
-      h += '<span style="flex:1;padding:8px;background:var(--surface-raised);border-radius:6px;font-size:var(--text-small);">' + esc(p.name) + ' (' + p.grams + 'g)</span>'
-      h += '<button class="icon-btn" data-action="rm-portion" data-idx="' + idx + '">✕</button>'
+      h += '<span style="flex:1;min-width:0;padding:8px;background:var(--surface-raised);border-radius:6px;font-size:var(--text-small);border:1px solid ' + (isEditing ? 'var(--protein)' : 'transparent') + ';">' + esc(p.name) + ' (' + p.grams + 'g)</span>'
+      h += '<button type="button" class="icon-btn" data-action="edit-portion" data-idx="' + idx + '" title="Modifier la portion" aria-label="Modifier la portion" style="display:flex;padding:6px;">' + iconPencil + '</button>'
+      h += '<button type="button" class="icon-btn" data-action="rm-portion" data-idx="' + idx + '" title="Supprimer la portion" aria-label="Supprimer la portion">✕</button>'
       h += '</div>'
     })
   }
@@ -1271,9 +1279,12 @@ function ingredientForm(editId) {
   h += '<div class="portion-add">'
   h += '<input id="f-portion-name" placeholder="ex. 1 tranche" value="' + esc(draft.portionName || '') + '"/>'
   h += '<input type="number" id="f-portion-grams" placeholder="Poids (g)" value="' + esc(draft.portionGrams || '') + '"/>'
-  h += '<button type="button" class="btn small primary" data-action="add-portion">Enregistrer</button>'
+  if (editingIdx !== null) {
+    h += '<button type="button" class="btn small" data-action="cancel-portion-edit" title="Annuler la modification" aria-label="Annuler la modification">' + iconClose + '</button>'
+  }
+  h += '<button type="button" class="btn small primary" data-action="add-portion" title="Enregistrer la portion" aria-label="Enregistrer la portion">' + iconCheck + '</button>'
   h += '</div>'
-  h += '</label>'
+  h += '</div>'
 
   // Séparateur avant la partie valeurs nutritionnelles
   h += '<div style="border-top:1px solid var(--border);margin:16px 0;"></div>'
@@ -2429,8 +2440,30 @@ function handleAction(action, el) {
       showToast('Donne un nom et un poids pour la portion')
       return
     }
-    if (!state._draftIngredient.portions) state._draftIngredient.portions = []
-    state._draftIngredient.portions.push({ name, grams })
+    const draftIng = state._draftIngredient
+    if (!draftIng.portions) draftIng.portions = []
+    const editing = draftIng.editingPortion
+    if (editing !== undefined && editing !== null && draftIng.portions[editing]) {
+      draftIng.portions[editing] = { name, grams }   // modification d'une portion existante
+    } else {
+      draftIng.portions.push({ name, grams })
+    }
+    draftIng.editingPortion = null
+    draftIng.portionName = ''
+    draftIng.portionGrams = ''
+    render()
+  } else if (action === 'edit-portion') {
+    if (!state._draftIngredient || !state._draftIngredient.portions) return
+    const idx = parseInt(el.getAttribute('data-idx'))
+    const portion = state._draftIngredient.portions[idx]
+    if (!portion) return
+    state._draftIngredient.editingPortion = idx
+    state._draftIngredient.portionName = portion.name
+    state._draftIngredient.portionGrams = portion.grams
+    render()
+  } else if (action === 'cancel-portion-edit') {
+    if (!state._draftIngredient) return
+    state._draftIngredient.editingPortion = null
     state._draftIngredient.portionName = ''
     state._draftIngredient.portionGrams = ''
     render()
@@ -2438,6 +2471,14 @@ function handleAction(action, el) {
     if (!state._draftIngredient) return
     const idx = parseInt(el.getAttribute('data-idx'))
     state._draftIngredient.portions.splice(idx, 1)
+    const editing = state._draftIngredient.editingPortion
+    if (editing === idx) {
+      state._draftIngredient.editingPortion = null
+      state._draftIngredient.portionName = ''
+      state._draftIngredient.portionGrams = ''
+    } else if (editing !== undefined && editing !== null && editing > idx) {
+      state._draftIngredient.editingPortion = editing - 1
+    }
     render()
   } else if (action === 'save-ing') {
     const editId = el.getAttribute('data-id')
@@ -2453,7 +2494,14 @@ function handleAction(action, el) {
     let portions = (state._draftIngredient && state._draftIngredient.portions) || []
     const pendingName = document.getElementById('f-portion-name').value.trim()
     const pendingGrams = parseFloat(document.getElementById('f-portion-grams').value)
-    if (pendingName && pendingGrams > 0) portions = portions.concat([{ name: pendingName, grams: pendingGrams }])
+    if (pendingName && pendingGrams > 0) {
+      const editing = state._draftIngredient ? state._draftIngredient.editingPortion : null
+      if (editing !== undefined && editing !== null && portions[editing]) {
+        portions = portions.map((p, i) => (i === editing ? { name: pendingName, grams: pendingGrams } : p))
+      } else {
+        portions = portions.concat([{ name: pendingName, grams: pendingGrams }])
+      }
+    }
 
     saveIngredientWithPhoto()
 

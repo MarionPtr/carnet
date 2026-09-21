@@ -111,8 +111,8 @@ input, select, textarea{
   border-radius:9px; padding:10px 11px; font-size:16px; font-family:inherit;
 }
 input:focus, select:focus, textarea:focus{ outline:none; border-color:var(--protein); }
-label.field{ display:block; margin-bottom:10px; }
-label.field .lbl{ display:block; font-size:var(--text-small); color:var(--text-muted); margin-bottom:5px; }
+label.field, div.field{ display:block; margin-bottom:10px; }
+label.field .lbl, div.field .lbl{ display:block; font-size:var(--text-small); color:var(--text-muted); margin-bottom:5px; }
 .row2{ display:flex; gap:8px; }
 
 /* Champ + bouton « Coller » */
@@ -207,7 +207,7 @@ nav.tabs button.active{ color:var(--kcal); background:var(--surface-raised); }
 .portion-add{ display:flex; gap:6px; align-items:stretch; }
 .portion-add input:first-child{ flex:1; min-width:0; }
 .portion-add input[type="number"]{ flex:0 0 96px; min-width:0; }
-.portion-add .btn{ flex-shrink:0; padding:0 12px; }
+.portion-add .btn{ flex-shrink:0; width:44px; padding:0; display:flex; align-items:center; justify-content:center; }
 
 .toast{
   position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
