@@ -930,26 +930,26 @@ function recipeDetailBody(recipeId) {
   }
   h += '</div>'
 
+  // En-tête : type en haut à droite, titre à gauche, étoile à droite, lien de référence dessous
+  h += '<div style="padding:10px 14px 12px;">'
   if (r.type) {
-    h += '<div style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">' + esc(r.type) + '</div>'
+    h += '<div style="text-align:right;color:var(--text-muted);font-size:var(--text-small);font-weight:500;margin-bottom:4px;">' + esc(r.type) + '</div>'
   }
-  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
-  h += '<h2 style="margin:0;font-size:var(--text-h1);">' + esc(r.name) + '</h2>'
-  h += '<button data-action="toggle-recipe-favorite" data-id="' + r.id + '" style="background:none;border:none;cursor:pointer;font-size:28px;line-height:1;padding:2px;color:' + (r.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (r.is_favorite ? '★' : '☆') + '</button>'
+  h += '<div style="display:flex;align-items:center;gap:10px;">'
+  h += '<h2 style="margin:0;font-size:var(--text-h1);flex:1;min-width:0;">' + esc(r.name) + '</h2>'
+  h += '<button data-action="toggle-recipe-favorite" data-id="' + r.id + '" aria-label="Favori" style="background:none;border:none;cursor:pointer;font-size:28px;line-height:1;padding:2px;flex-shrink:0;color:' + (r.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (r.is_favorite ? '★' : '☆') + '</button>'
   h += '</div>'
-
   if (r.reference_url) {
-    h += '<a href="' + esc(r.reference_url) + '" target="_blank" rel="noopener" style="display:inline-block;color:var(--protein);font-size:var(--text-body);font-weight:600;margin:6px 0 16px;text-decoration:none;">🔗 Recette de référence</a>'
-  } else {
-    h += '<div style="margin-bottom:12px;"></div>'
+    h += '<a href="' + esc(r.reference_url) + '" target="_blank" rel="noopener" style="display:inline-block;color:var(--protein);font-size:var(--text-body);font-weight:600;margin-top:8px;text-decoration:none;">🔗 Recette de référence</a>'
   }
+  h += '</div>'
 
   h += '<div class="card" style="background:var(--surface-raised);padding:14px;margin-bottom:16px;">'
   h += '<div style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Valeurs nutritionnelles par part</div>'
   h += '<div style="border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:10px;">'
   h += '<div style="display:flex;justify-content:space-between;align-items:center;">'
   h += '<div style="font-size:var(--text-body);">Énergie</div>'
-  h += '<div style="font-size:var(--text-h1);font-weight:700;">' + round(m.kcal) + ' <span style="font-size:var(--text-body);">kcal</span></div>'
+  h += '<div style="font-size:var(--text-h2);font-weight:700;">' + round(m.kcal) + ' <span style="font-size:var(--text-body);">kcal</span></div>'
   h += '</div></div>'
   h += '<div style="display:flex;flex-direction:column;gap:10px;">'
   h += '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:var(--text-body);">Protéines</div><div style="font-weight:600;color:var(--protein);font-size:var(--text-h2);">' + round(m.protein) + ' <span style="font-size:var(--text-small);color:var(--text-muted);font-weight:400;">g</span></div></div>'
@@ -1805,22 +1805,21 @@ function ingredientDetailBody(ingId) {
   h += '</div>'
 
   const hasBrand = ing.brands && ing.brands.length > 0
-  h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (hasBrand ? '4px' : '14px') + ';">'
-  // L'étoile suit directement la dernière ligne du nom, même quand il passe sur deux lignes
-  h += '<div style="flex:1;min-width:0;">'
-  h += '<h2 style="margin:0;font-size:var(--text-h1);">' + esc(ing.name) + ' <button data-action="toggle-favorite" data-id="' + ing.id + '" style="background:none;border:none;cursor:pointer;font-size:28px;line-height:1;padding:0 2px;vertical-align:middle;color:' + (ing.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (ing.is_favorite ? '★' : '☆') + '</button></h2>'
-  h += '</div>'
-  if (ing.category) {
-    h += '<div style="flex-shrink:0;color:var(--text-muted);font-size:var(--text-small);font-weight:500;">' + esc(ing.category) + '</div>'
-  }
-  h += '</div>'
-
   const portions = getIngredientPortions(ing)
 
-  // Marque
-  if (hasBrand) {
-    h += '<div style="color:var(--text-muted);font-size:var(--text-body);margin-bottom:16px;">' + esc(ing.brands.join(', ')) + '</div>'
+  // En-tête : catégorie en haut à droite, titre à gauche, étoile à droite, marque dessous
+  h += '<div style="padding:10px 14px 12px;">'
+  if (ing.category) {
+    h += '<div style="text-align:right;color:var(--text-muted);font-size:var(--text-small);font-weight:500;margin-bottom:4px;">' + esc(ing.category) + '</div>'
   }
+  h += '<div style="display:flex;align-items:center;gap:10px;">'
+  h += '<h2 style="margin:0;font-size:var(--text-h1);flex:1;min-width:0;">' + esc(ing.name) + '</h2>'
+  h += '<button data-action="toggle-favorite" data-id="' + ing.id + '" aria-label="Favori" style="background:none;border:none;cursor:pointer;font-size:28px;line-height:1;padding:2px;flex-shrink:0;color:' + (ing.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (ing.is_favorite ? '★' : '☆') + '</button>'
+  h += '</div>'
+  if (hasBrand) {
+    h += '<div style="color:var(--text-muted);font-size:var(--text-body);margin-top:4px;">' + esc(ing.brands.join(', ')) + '</div>'
+  }
+  h += '</div>'
 
   // Toggle 100g / portion(s)
   const activePortion = (state._ingDetailPortionIdx != null && portions[state._ingDetailPortionIdx]) ? portions[state._ingDetailPortionIdx] : null
@@ -1844,7 +1843,7 @@ function ingredientDetailBody(ingId) {
   h += '<div style="border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:10px;">'
   h += '<div style="display:flex;justify-content:space-between;align-items:center;">'
   h += '<div style="font-size:var(--text-body);">Énergie</div>'
-  h += '<div style="font-size:var(--text-h1);font-weight:700;">' + round(ing.kcal * factor) + ' <span style="font-size:var(--text-body);">kcal</span></div>'
+  h += '<div style="font-size:var(--text-h2);font-weight:700;">' + round(ing.kcal * factor) + ' <span style="font-size:var(--text-body);">kcal</span></div>'
   h += '</div></div>'
 
   // Macros principales
@@ -1855,11 +1854,12 @@ function ingredientDetailBody(ingId) {
 
   // Détails supplémentaires
   if (ing.saturated_fat || ing.fiber || ing.sugar || ing.salt) {
-    h += '<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px;">'
-    if (ing.saturated_fat) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-body);margin-bottom:6px;"><div>Acides gras saturés</div><div style="font-weight:500;">' + round(ing.saturated_fat * factor) + ' g</div></div>'
-    if (ing.sugar) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-body);margin-bottom:6px;"><div>Sucres</div><div style="font-weight:500;">' + round(ing.sugar * factor) + ' g</div></div>'
-    if (ing.fiber) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-body);margin-bottom:6px;"><div>Fibres</div><div style="font-weight:500;">' + round(ing.fiber * factor) + ' g</div></div>'
-    if (ing.salt) h += '<div style="display:flex;justify-content:space-between;font-size:var(--text-body);"><div>Sel</div><div style="font-weight:500;">' + round(ing.salt * factor) + ' g</div></div>'
+    h += '<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px;display:flex;flex-direction:column;gap:10px;">'
+    const detailRow = (label, value) => '<div style="display:flex;justify-content:space-between;align-items:center;font-size:var(--text-body);min-height:24px;"><div>' + label + '</div><div style="font-weight:500;">' + round(value * factor) + ' g</div></div>'
+    if (ing.saturated_fat) h += detailRow('Acides gras saturés', ing.saturated_fat)
+    if (ing.sugar) h += detailRow('Sucres', ing.sugar)
+    if (ing.fiber) h += detailRow('Fibres', ing.fiber)
+    if (ing.salt) h += detailRow('Sel', ing.salt)
     h += '</div>'
   }
 
