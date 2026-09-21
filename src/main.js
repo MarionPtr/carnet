@@ -1243,7 +1243,7 @@ function ingredientForm(editId) {
   h += '</div>'
   h += '</label>'
 
-  h += '<label class="field"><span class="lbl">Nom</span>' + withPaste('<input id="f-name" value="' + esc(draft.name) + '" placeholder="ex. Blanc de poulet"/>', 'f-name') + '</label>'
+  h += '<label class="field"><span class="lbl">Nom</span><input id="f-name" value="' + esc(draft.name) + '" placeholder="ex. Blanc de poulet"/></label>'
 
   h += '<label class="field"><span class="lbl">Catégorie</span><select id="f-category">'
   h += '<option value="">Sélectionner une catégorie</option>'
@@ -1254,16 +1254,8 @@ function ingredientForm(editId) {
   h += '</select></label>'
   h += '<input id="f-new-category" type="text" placeholder="Nouvelle catégorie" style="display:none;margin-bottom:10px;"/>'
 
-  h += '<label class="field"><span class="lbl">Marques</span>'
-  h += '<div style="margin-bottom:8px;">'
-  if (draft.brands && draft.brands.length > 0) {
-    draft.brands.forEach((brand, idx) => {
-      h += '<div style="display:flex;gap:6px;margin-bottom:6px;"><span style="flex:1;padding:8px;background:var(--surface-raised);border-radius:6px;font-size:var(--text-small);">' + esc(brand) + '</span><button class="icon-btn" data-action="rm-brand" data-idx="' + idx + '">✕</button></div>'
-    })
-  }
-  h += '</div>'
-  h += '<div style="display:flex;gap:6px;"><input id="f-brand-input" placeholder="Ajouter une marque" style="flex:1;min-width:0;"/>' + pasteButtonHtml('f-brand-input') + '<button class="btn small" data-action="add-brand">+</button></div>'
-  h += '</label>'
+  const brandValue = draft.brand !== undefined ? draft.brand : ((draft.brands && draft.brands[0]) || '')
+  h += '<label class="field"><span class="lbl">Marque</span><input id="f-brand" value="' + esc(brandValue) + '" placeholder="ex. Danone"/></label>'
 
   h += '<label class="field"><span class="lbl">Portions</span>'
   h += '<div style="margin-bottom:8px;">'
@@ -1276,22 +1268,21 @@ function ingredientForm(editId) {
     })
   }
   h += '</div>'
-  h += '<div class="row2" style="margin-bottom:8px;">'
-  h += '<input id="f-portion-name" placeholder="ex. 1 yaourt, 1 tranche"/>'
-  h += '<input type="number" id="f-portion-grams" placeholder="Poids (g)"/>'
+  h += '<div class="portion-add">'
+  h += '<input id="f-portion-name" placeholder="ex. 1 tranche" value="' + esc(draft.portionName || '') + '"/>'
+  h += '<input type="number" id="f-portion-grams" placeholder="Poids (g)" value="' + esc(draft.portionGrams || '') + '"/>'
+  h += '<button type="button" class="btn small primary" data-action="add-portion">Enregistrer</button>'
   h += '</div>'
-  h += '<button class="btn small block" data-action="add-portion">+ Ajouter une portion</button>'
   h += '</label>'
 
   // Séparateur avant la partie valeurs nutritionnelles
   h += '<div style="border-top:1px solid var(--border);margin:16px 0;"></div>'
   const unit = draft.unit || 'g'
-  h += '<label class="field"><span class="lbl">Valeurs nutritionnelles pour 100</span>'
-  h += '<div class="segmented">'
+  h += '<div class="unit-row"><span class="lbl">Valeurs nutritionnelles pour 100</span>'
+  h += '<div class="segmented small">'
   h += '<button type="button" class="' + (unit === 'g' ? 'active' : '') + '" data-action="set-ing-unit" data-unit="g">g</button>'
   h += '<button type="button" class="' + (unit === 'ml' ? 'active' : '') + '" data-action="set-ing-unit" data-unit="ml">ml</button>'
-  h += '</div>'
-  h += '</label>'
+  h += '</div></div>'
 
   h += '<label class="field"><span class="lbl">Calories (kcal)</span>' + withPaste('<input type="number" id="f-kcal" value="' + (draft.kcal || '') + '"/>', 'f-kcal') + '</label>'
   h += '<div class="row2">'
@@ -1993,7 +1984,8 @@ function bindEvents() {
   // (message, changement d'unité, ajout d'une marque...)
   const ingDraftFields = {
     'f-name': 'name', 'f-kcal': 'kcal', 'f-fat': 'fat', 'f-saturated-fat': 'saturated_fat',
-    'f-carbs': 'carbs', 'f-sugar': 'sugar', 'f-protein': 'protein', 'f-fiber': 'fiber', 'f-salt': 'salt'
+    'f-carbs': 'carbs', 'f-sugar': 'sugar', 'f-protein': 'protein', 'f-fiber': 'fiber', 'f-salt': 'salt',
+    'f-brand': 'brand', 'f-portion-name': 'portionName', 'f-portion-grams': 'portionGrams'
   }
   Object.keys(ingDraftFields).forEach(id => {
     const field = document.getElementById(id)
@@ -2427,23 +2419,6 @@ function handleAction(action, el) {
     state.viewIngId = null
     render()
     window.scrollTo(0, state._ingScrollY)
-  } else if (action === 'add-brand') {
-    if (!state._draftIngredient) state._draftIngredient = {}
-    const input = document.getElementById('f-brand-input')
-    const brand = input.value.trim()
-    if (!brand) {
-      showToast('Saisis le nom de la marque')
-      return
-    }
-    if (!state._draftIngredient.brands) state._draftIngredient.brands = []
-    state._draftIngredient.brands.push(brand)
-    input.value = ''
-    render()
-  } else if (action === 'rm-brand') {
-    if (!state._draftIngredient) return
-    const idx = parseInt(el.getAttribute('data-idx'))
-    state._draftIngredient.brands.splice(idx, 1)
-    render()
   } else if (action === 'add-portion') {
     if (!state._draftIngredient) state._draftIngredient = {}
     const nameInput = document.getElementById('f-portion-name')
@@ -2456,6 +2431,8 @@ function handleAction(action, el) {
     }
     if (!state._draftIngredient.portions) state._draftIngredient.portions = []
     state._draftIngredient.portions.push({ name, grams })
+    state._draftIngredient.portionName = ''
+    state._draftIngredient.portionGrams = ''
     render()
   } else if (action === 'rm-portion') {
     if (!state._draftIngredient) return
@@ -2471,6 +2448,12 @@ function handleAction(action, el) {
     }
 
     const photo = document.getElementById('f-photo-url').value.trim()
+    const brand = document.getElementById('f-brand').value.trim()
+    // Une portion saisie mais pas encore « enregistrée » est ajoutée automatiquement
+    let portions = (state._draftIngredient && state._draftIngredient.portions) || []
+    const pendingName = document.getElementById('f-portion-name').value.trim()
+    const pendingGrams = parseFloat(document.getElementById('f-portion-grams').value)
+    if (pendingName && pendingGrams > 0) portions = portions.concat([{ name: pendingName, grams: pendingGrams }])
 
     saveIngredientWithPhoto()
 
@@ -2497,7 +2480,7 @@ function handleAction(action, el) {
         id: editId || uid(),
         name,
         category: category,
-        portions: state._draftIngredient?.portions || [],
+        portions: portions,
         kcal: parseFloat(document.getElementById('f-kcal').value) || 0,
         protein: parseFloat(document.getElementById('f-protein').value) || 0,
         carbs: parseFloat(document.getElementById('f-carbs').value) || 0,
@@ -2507,7 +2490,7 @@ function handleAction(action, el) {
         sugar: parseFloat(document.getElementById('f-sugar').value) || 0,
         salt: parseFloat(document.getElementById('f-salt').value) || 0,
         unit: state._draftIngredient?.unit || 'g',
-        brands: state._draftIngredient?.brands || [],
+        brands: brand ? [brand] : [],
         photo: photo
       }
       if (editId) {

@@ -196,6 +196,18 @@ nav.tabs button.active{ color:var(--kcal); background:var(--surface-raised); }
 .segmented{ display:flex; background:var(--bg); border:1px solid var(--border-strong); border-radius:10px; padding:3px; }
 .segmented button{ flex:1; background:none; border:none; color:var(--text-muted); padding:7px 4px; font-size:var(--text-small); border-radius:8px; }
 .segmented button.active{ background:var(--surface-raised); color:var(--text); }
+.segmented.small{ padding:2px; border-radius:8px; flex-shrink:0; }
+.segmented.small button{ flex:none; padding:3px 12px; }
+
+/* Ligne « Valeurs nutritionnelles pour 100 » + choix g / ml */
+.unit-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+.unit-row .lbl{ font-size:var(--text-small); color:var(--text-muted); }
+
+/* Saisie d'une portion : nom, poids et bouton sur la même ligne */
+.portion-add{ display:flex; gap:6px; align-items:stretch; }
+.portion-add input:first-child{ flex:1; min-width:0; }
+.portion-add input[type="number"]{ flex:0 0 96px; min-width:0; }
+.portion-add .btn{ flex-shrink:0; padding:0 12px; }
 
 .toast{
   position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
