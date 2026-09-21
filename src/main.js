@@ -486,6 +486,12 @@ function ingFamilySectionHtml(group, grouped) {
   return h
 }
 
+// La recherche porte sur le nom ET sur la marque
+function ingMatchesSearch(i, q) {
+  if (i.name.toLowerCase().indexOf(q) > -1) return true
+  return (i.brands || []).some(b => String(b).toLowerCase().indexOf(q) > -1)
+}
+
 // Marque(s) du produit, en petit et en gris sous le nom (vide s'il n'y en a pas)
 function ingBrandHtml(i, marginTop) {
   if (!i.brands || i.brands.length === 0) return ''
@@ -535,7 +541,7 @@ function ingGroupHtml(list) {
 
 function renderIngredients() {
   const q = state.ingSearch.toLowerCase()
-  const filtered = state.ingredients.filter(i => i.name.toLowerCase().indexOf(q) > -1 && (!state.ingFavoritesOnly || i.is_favorite))
+  const filtered = state.ingredients.filter(i => ingMatchesSearch(i, q) && (!state.ingFavoritesOnly || i.is_favorite))
 
   // Group by category
   const grouped = {}
@@ -1624,7 +1630,7 @@ function editRecipeTypeForm(idx) {
 function recipeIngPickerModal() {
   const q = state._recipeIngPickerSearch.toLowerCase()
   const categoryMode = state._recipeIngPickerViewMode === 'category'
-  const filtered = state.ingredients.filter(i => i.name.toLowerCase().indexOf(q) > -1)
+  const filtered = state.ingredients.filter(i => ingMatchesSearch(i, q))
 
   let h = '<h2>Choisir un ingrédient</h2>'
   h += '<div style="display:flex;gap:8px;margin-bottom:14px;">'
