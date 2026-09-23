@@ -102,6 +102,10 @@ const systemThemeQuery = window.matchMedia('(prefers-color-scheme: light)')
 function applyTheme(theme) {
   const resolved = theme === 'system' ? (systemThemeQuery.matches ? 'light' : 'dark') : theme
   document.documentElement.setAttribute('data-theme', resolved)
+  // La couleur de la barre du navigateur (Safari, fenêtre PWA) doit suivre le thème choisi,
+  // pas rester figée sur le fond sombre
+  const meta = document.querySelector('meta[name="theme-color"]')
+  if (meta) meta.setAttribute('content', resolved === 'light' ? '#FFFFFF' : '#0A0A0A')
 }
 
 // Si le mode "système" est actif, suivre les changements de préférence en direct
