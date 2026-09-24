@@ -1513,7 +1513,7 @@ function parseInstructionSteps(text) {
     .split('\n')
     .map(l => l.trim().replace(/^\d+[.)\-]?\s*/, ''))
     .filter(l => l.length > 0)
-  return steps.length > 0 ? steps : ['']
+  return steps
 }
 
 // Reconstruit le texte enregistré : une ligne numérotée par étape non vide
@@ -1586,7 +1586,6 @@ function recipeForm(editId) {
     h += '<div class="card" style="background:var(--surface-raised);margin-bottom:14px;"><div id="rf-totals">' + recipeTotalsHtml(draft) + '</div></div>'
   }
 
-  h += '<span class="lbl" style="display:block;margin-bottom:8px;">Instructions</span>'
   draft.instructionSteps.forEach((step, idx) => {
     h += '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;">'
     h += '<div style="width:24px;height:24px;flex-shrink:0;margin-top:6px;border-radius:50%;background:var(--surface-raised);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:var(--text-caption);font-weight:600;">' + (idx + 1) + '</div>'
@@ -1594,7 +1593,7 @@ function recipeForm(editId) {
     h += '<button type="button" class="icon-btn" data-action="rm-instruction-step" data-idx="' + idx + '" aria-label="Supprimer l\'étape" style="flex-shrink:0;margin-top:2px;">✕</button>'
     h += '</div>'
   })
-  h += '<button type="button" data-action="add-instruction-step" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;margin-bottom:16px;background:none;border:1px dashed var(--border-strong);border-radius:8px;color:var(--text-muted);font-size:var(--text-body);cursor:pointer;"><span style="font-size:16px;line-height:1;">+</span>Ajouter une étape</button>'
+  h += '<button type="button" data-action="add-instruction-step" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;margin-bottom:16px;background:none;border:1px dashed var(--border-strong);border-radius:8px;color:var(--text-muted);font-size:var(--text-body);cursor:pointer;"><span style="font-size:16px;line-height:1;">+</span>' + (draft.instructionSteps.length > 0 ? 'Ajouter une étape' : 'Ajouter des instructions') + '</button>'
 
   const saveHint = recipeSaveHint(draft)
   h += '<button class="btn primary block" id="save-recipe-btn" data-action="save-recipe" data-id="' + (editId || '') + '"' + (saveHint ? ' disabled' : '') + '>Enregistrer la recette</button>'
@@ -2949,7 +2948,6 @@ function handleAction(action, el) {
     if (!state._draftRecipe) return
     const idx = parseInt(el.getAttribute('data-idx'))
     state._draftRecipe.instructionSteps.splice(idx, 1)
-    if (state._draftRecipe.instructionSteps.length === 0) state._draftRecipe.instructionSteps.push('')
     render()
   } else if (action === 'rm-recipe-item') {
     const idx = parseInt(el.getAttribute('data-idx'))
