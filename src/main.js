@@ -1573,7 +1573,7 @@ function recipeForm(editId) {
   h += '<button type="button" data-action="rf-servings-step" data-delta="1" style="' + stepBtn + '">+</button>'
   h += '</div>'
 
-  h += '<span class="lbl" style="display:block;margin-bottom:6px;">Ingrédients</span>'
+  if (draft.items.length > 0) h += '<span class="lbl" style="display:block;margin-bottom:6px;">Ingrédients</span>'
 
   if (state.ingredients.length === 0) {
     h += '<div class="empty">Ajoute d\'abord des ingrédients.</div>'
