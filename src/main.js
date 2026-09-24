@@ -1506,11 +1506,30 @@ function recipePhotoPreviewHtml(photo) {
     : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:var(--text-h2);">📷</div>'
 }
 
+// Découpe le texte des instructions (une ligne = une étape) en enlevant une éventuelle
+// numérotation déjà présente ("1. ", "2) "...) et les lignes vides. Toujours au moins une étape.
+function parseInstructionSteps(text) {
+  const steps = (text || '')
+    .split('\n')
+    .map(l => l.trim().replace(/^\d+[.)\-]?\s*/, ''))
+    .filter(l => l.length > 0)
+  return steps.length > 0 ? steps : ['']
+}
+
+// Reconstruit le texte enregistré : une ligne numérotée par étape non vide
+function buildInstructionsText(steps) {
+  return steps
+    .map(s => s.trim())
+    .filter(s => s.length > 0)
+    .map((s, i) => (i + 1) + '. ' + s)
+    .join('\n')
+}
+
 function recipeForm(editId) {
   if (!state._draftRecipe || state._draftRecipe.__for !== editId) {
     const r = editId
       ? state.recipes.find(x => x.id === editId)
-      : { name: '', servings: 4, type: '', reference_url: '', photo: '', instructions: '', items: [] }
+      : { name: '', servings: 1, type: '', reference_url: '', photo: '', instructions: '', items: [] }
     state._draftRecipe = {
       __for: editId,
       name: r.name,
@@ -1518,7 +1537,7 @@ function recipeForm(editId) {
       type: r.type || '',
       reference_url: r.reference_url || '',
       photo: r.photo || '',
-      instructions: r.instructions || '',
+      instructionSteps: parseInstructionSteps(r.instructions),
       // portionIdx : affichage seulement (null = grammes) ; non enregistré
       items: (r.items || []).map(i => ({ ingredient_id: i.ingredient_id, grams: i.grams, portionIdx: detectPortionIdx(state.ingredients.find(x => x.id === i.ingredient_id), i.grams) }))
     }
@@ -1544,7 +1563,7 @@ function recipeForm(editId) {
   h += '</select></label>'
   h += '<input id="rf-new-type" type="text" placeholder="Nouveau type" value="' + esc(draft.newType || '') + '" style="display:' + (draft.type === '__new__' ? 'block' : 'none') + ';margin-bottom:10px;"/>'
 
-  h += '<label class="field"><span class="lbl">Lien de la recette de référence</span><input id="rf-reference-url" value="' + esc(draft.reference_url) + '" placeholder="https://…"/></label>'
+  h += '<label class="field"><span class="lbl">Lien de la recette de référence</span><input id="rf-reference-url" autocomplete="off" value="' + esc(draft.reference_url) + '" placeholder="https://…"/></label>'
 
   const stepBtn = 'width:36px;height:36px;padding:0;line-height:1;border-radius:50%;background:var(--surface-raised);color:var(--text);border:1px solid var(--border-strong);font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;'
   h += '<span class="lbl" style="display:block;margin-bottom:6px;">Nombre de portions</span>'
@@ -1567,7 +1586,15 @@ function recipeForm(editId) {
     h += '<div class="card" style="background:var(--surface-raised);margin-bottom:14px;"><div id="rf-totals">' + recipeTotalsHtml(draft) + '</div></div>'
   }
 
-  h += '<label class="field"><span class="lbl">Instructions</span><textarea id="rf-instructions" rows="6" placeholder="Étapes de la recette…" style="resize:vertical;">' + esc(draft.instructions) + '</textarea></label>'
+  h += '<span class="lbl" style="display:block;margin-bottom:8px;">Instructions</span>'
+  draft.instructionSteps.forEach((step, idx) => {
+    h += '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;">'
+    h += '<div style="width:24px;height:24px;flex-shrink:0;margin-top:6px;border-radius:50%;background:var(--surface-raised);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:var(--text-caption);font-weight:600;">' + (idx + 1) + '</div>'
+    h += '<input class="input-sm" data-instr-idx="' + idx + '" value="' + esc(step) + '" placeholder="Étape ' + (idx + 1) + '" style="flex:1;"/>'
+    h += '<button type="button" class="icon-btn" data-action="rm-instruction-step" data-idx="' + idx + '" aria-label="Supprimer l\'étape" style="flex-shrink:0;margin-top:2px;">✕</button>'
+    h += '</div>'
+  })
+  h += '<button type="button" data-action="add-instruction-step" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;margin-bottom:16px;background:none;border:1px dashed var(--border-strong);border-radius:8px;color:var(--text-muted);font-size:var(--text-body);cursor:pointer;"><span style="font-size:16px;line-height:1;">+</span>Ajouter une étape</button>'
 
   const saveHint = recipeSaveHint(draft)
   h += '<button class="btn primary block" id="save-recipe-btn" data-action="save-recipe" data-id="' + (editId || '') + '"' + (saveHint ? ' disabled' : '') + '>Enregistrer la recette</button>'
@@ -2325,13 +2352,13 @@ function bindEvents() {
       state._draftRecipe.reference_url = rfReferenceUrl.value
     })
   }
-  const rfInstructions = document.getElementById('rf-instructions')
-  if (rfInstructions) {
-    rfInstructions.addEventListener('input', () => {
+  // Étapes d'instructions : chaque champ met à jour son étape sans réafficher la page (le clavier reste ouvert)
+  app.querySelectorAll('[data-instr-idx]').forEach(inp => {
+    inp.addEventListener('input', () => {
       if (!state._draftRecipe) return
-      state._draftRecipe.instructions = rfInstructions.value
+      state._draftRecipe.instructionSteps[parseInt(inp.getAttribute('data-instr-idx'))] = inp.value
     })
-  }
+  })
   const rfPhotoUrl = document.getElementById('rf-photo-url')
   if (rfPhotoUrl) {
     rfPhotoUrl.addEventListener('input', () => {
@@ -2914,6 +2941,16 @@ function handleAction(action, el) {
     const count = Math.max(0.5, it.grams / portion.grams + (parseFloat(el.getAttribute('data-delta')) || 0))
     it.grams = round(count * portion.grams, 2)
     render()
+  } else if (action === 'add-instruction-step') {
+    if (!state._draftRecipe) return
+    state._draftRecipe.instructionSteps.push('')
+    render()
+  } else if (action === 'rm-instruction-step') {
+    if (!state._draftRecipe) return
+    const idx = parseInt(el.getAttribute('data-idx'))
+    state._draftRecipe.instructionSteps.splice(idx, 1)
+    if (state._draftRecipe.instructionSteps.length === 0) state._draftRecipe.instructionSteps.push('')
+    render()
   } else if (action === 'rm-recipe-item') {
     const idx = parseInt(el.getAttribute('data-idx'))
     state._draftRecipe.items.splice(idx, 1)
@@ -2956,7 +2993,7 @@ function handleAction(action, el) {
       photo: document.getElementById('rf-photo-url').value.trim(),
       items: draft.items.map(it => ({ ingredient_id: it.ingredient_id, grams: it.grams }))
     }
-    const instructions = document.getElementById('rf-instructions').value.trim()
+    const instructions = buildInstructionsText(draft.instructionSteps)
     const existingRecipe = editId2 ? state.recipes.find(r => r.id === editId2) : null
     if (instructions || (existingRecipe && 'instructions' in existingRecipe)) {
       obj2.instructions = instructions
