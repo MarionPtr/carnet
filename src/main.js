@@ -1872,6 +1872,10 @@ function weightChartSvg(logs) {
   return h
 }
 
+function iconPencilSmall() {
+  return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>'
+}
+
 function weightPageBody() {
   const logs = state.weightLogs
   let h = ''
@@ -1892,7 +1896,7 @@ function weightPageBody() {
   h += '<input type="date" id="wl-date" value="' + todayStr() + '" max="' + todayStr() + '"/>'
   h += '<input type="number" id="wl-weight" inputmode="decimal" step="0.1" placeholder="Poids (kg)"/>'
   h += '</div>'
-  h += '<button class="btn primary block" data-action="add-weight-log" style="margin-bottom:20px;">Enregistrer la pesée</button>'
+  h += '<button class="btn primary block" data-action="add-weight-log" style="margin-bottom:20px;">' + (state._editingWeightLog ? 'Modifier la pesée' : 'Enregistrer la pesée') + '</button>'
 
   if (logs.length > 0) {
     h += '<span class="lbl" style="display:block;margin-bottom:6px;">Historique</span>'
@@ -1900,8 +1904,9 @@ function weightPageBody() {
     logs.slice().reverse().forEach((l, idx, arr) => {
       h += '<div class="list-item" style="padding:12px;' + (idx < arr.length - 1 ? '' : 'border-bottom:none;') + '">'
       h += '<span>' + formatDateShortFR(l.log_date) + '</span>'
-      h += '<div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;">' + round(l.weight, 1) + ' kg</span>'
-      h += '<button class="icon-btn" data-action="del-weight-log" data-id="' + l.id + '" aria-label="Supprimer cette pesée">✕</button></div>'
+      h += '<div style="display:flex;align-items:center;gap:6px;"><span style="font-weight:600;margin-right:4px;">' + round(l.weight, 1) + ' kg</span>'
+      h += '<button type="button" class="icon-btn" data-action="edit-weight-log" data-id="' + l.id + '" title="Modifier cette pesée" aria-label="Modifier cette pesée" style="display:flex;padding:6px;">' + iconPencilSmall() + '</button>'
+      h += '<button type="button" class="icon-btn" data-action="del-weight-log" data-id="' + l.id + '" aria-label="Supprimer cette pesée">✕</button></div>'
       h += '</div>'
     })
     h += '</div>'
@@ -2762,6 +2767,7 @@ function handleAction(action, el) {
   } else if (action === 'open-objectives' || action === 'open-settings' || action === 'open-weight') {
     state._profileScrollY = window.scrollY
     state.profilePage = action === 'open-settings' ? 'settings' : action === 'open-weight' ? 'weight' : 'objectives'
+    state._editingWeightLog = null
     state.modal = null
     render()
     window.scrollTo(0, 0)
@@ -2773,6 +2779,15 @@ function handleAction(action, el) {
     if (!weight || weight <= 0) {
       showToast('Indique un poids')
       return
+    }
+    // En modification, si la date a changé, l'ancienne ligne (autre jour) est retirée pour ne pas laisser un doublon
+    const editingId = state._editingWeightLog
+    if (editingId) {
+      const original = state.weightLogs.find(l => l.id === editingId)
+      if (original && original.log_date !== logDate) {
+        state.weightLogs = state.weightLogs.filter(l => l.id !== editingId)
+        persist(deleteWeightLog(editingId))
+      }
     }
     const entry = { id: uid(), person_id: state.currentPerson, log_date: logDate, weight }
     const existingIdx = state.weightLogs.findIndex(l => l.log_date === logDate)
@@ -2787,12 +2802,26 @@ function handleAction(action, el) {
       state.profile.weight = weight
       persist(saveProfile(state.profile))
     }
+    state._editingWeightLog = null
     weightInput.value = ''
     render()
     showToast('Pesée enregistrée')
+  } else if (action === 'edit-weight-log') {
+    const log = state.weightLogs.find(l => l.id === el.getAttribute('data-id'))
+    if (!log) return
+    state._editingWeightLog = log.id
+    render()
+    const dateInput = document.getElementById('wl-date')
+    const weightInput = document.getElementById('wl-weight')
+    dateInput.value = log.log_date
+    weightInput.value = log.weight
+    weightInput.focus()
+    weightInput.select()
+    dateInput.scrollIntoView({ block: 'center', behavior: 'smooth' })
   } else if (action === 'del-weight-log') {
     const id = el.getAttribute('data-id')
     state.weightLogs = state.weightLogs.filter(l => l.id !== id)
+    if (state._editingWeightLog === id) state._editingWeightLog = null
     persist(deleteWeightLog(id))
     render()
   } else if (action === 'close-profile-page') {
