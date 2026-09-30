@@ -19,6 +19,9 @@ import {
   deleteCategory,
   loadFamilies,
   loadCategoryFamilies,
+  loadWeightLogs,
+  saveWeightLog,
+  deleteWeightLog,
   addFamily,
   renameFamily,
   deleteFamily,
@@ -155,7 +158,8 @@ const state = {
   _ingDetailPortionIdx: null,
   _draftIngredient: null,
   _draftRecipe: null,
-  profilePage: null, // sous-page du profil : 'settings' | 'objectives' (null = profil)
+  profilePage: null, // sous-page du profil : 'settings' | 'objectives' | 'weight' (null = profil)
+  weightLogs: [], // pesées de la personne courante, triées par date
   _profileScrollY: 0,
   viewIngId: null, // ingrédient affiché en pleine page (null = liste)
   _ingScrollY: 0,
@@ -202,6 +206,7 @@ async function init() {
     state.families = await loadFamilies()
     state.categoryFamily = await loadCategoryFamilies()
     state.recipeTypes = await loadRecipeTypes()
+    state.weightLogs = await loadWeightLogs(state.currentPerson)
   } catch (e) {
     console.error('Erreur lors du chargement:', e)
   }
@@ -1006,13 +1011,15 @@ function recipeDetailBody(recipeId) {
 
 // ========== PROFILE ==========
 function renderProfileSubPage() {
-  const isSettings = state.profilePage === 'settings'
+  const page = state.profilePage
+  const titles = { settings: 'Paramètres', objectives: 'Objectifs', weight: 'Poids' }
+  const bodies = { settings: settingsPageBody, objectives: objectivesPageBody, weight: weightPageBody }
   let h = '<header class="top" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
   h += '<button data-action="close-profile-page" title="Retour au profil" style="width:40px;height:40px;flex-shrink:0;padding:0;border-radius:50%;background:var(--surface-raised);color:var(--text);border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;cursor:pointer;"><span class="header-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></span></button>'
-  h += '<h1 style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;text-align:center;flex:1;">' + (isSettings ? 'Paramètres' : 'Objectifs') + '</h1>'
+  h += '<h1 style="font-size:var(--text-small);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;text-align:center;flex:1;">' + (titles[page] || '') + '</h1>'
   h += '<div style="width:40px;flex-shrink:0;"></div>'
   h += '</header>'
-  h += '<section style="padding-bottom:32px;">' + (isSettings ? settingsPageBody() : objectivesPageBody()) + '</section>'
+  h += '<section style="padding-bottom:32px;">' + (bodies[page] ? bodies[page]() : '') + '</section>'
   return h
 }
 
@@ -1054,6 +1061,16 @@ function renderProfile() {
   h += '<div style="display:flex;align-items:center;"><span style="margin-right:10px;">🎯</span>'
   h += '<div><div style="font-size:var(--text-body);font-weight:600;">Objectifs</div>'
   h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + goalLabels[p.goal] + ' · ' + targets.kcal + ' kcal / jour</div></div></div>'
+  h += '<span style="color:var(--text-muted);">›</span>'
+  h += '</button>'
+  h += '</div>'
+
+  // === POIDS ===
+  h += '<div class="card" style="padding-top:2px;padding-bottom:2px;">'
+  h += '<button class="list-item" style="width:100%;background:none;border:none;text-align:left;cursor:pointer;color:var(--text);font-size:var(--text-body);" data-action="open-weight">'
+  h += '<div style="display:flex;align-items:center;"><span style="margin-right:10px;">⚖️</span>'
+  h += '<div><div style="font-size:var(--text-body);font-weight:600;">Poids</div>'
+  h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + weightSummaryText() + '</div></div></div>'
   h += '<span style="color:var(--text-muted);">›</span>'
   h += '</button>'
   h += '</div>'
@@ -1798,6 +1815,99 @@ function objectiveSummaryHtml() {
 function refreshObjectiveSummary() {
   const el = document.getElementById('obj-summary')
   if (el) el.innerHTML = objectiveSummaryHtml()
+}
+
+// Court résumé affiché sur la carte "Poids" du profil
+function weightSummaryText() {
+  const logs = state.weightLogs
+  if (logs.length === 0) return 'Aucune pesée enregistrée'
+  const last = logs[logs.length - 1]
+  if (logs.length === 1) return round(last.weight, 1) + ' kg'
+  const first = logs[0]
+  const delta = last.weight - first.weight
+  const days = Math.round((parseLocalDate(last.log_date) - parseLocalDate(first.log_date)) / 86400000)
+  return round(last.weight, 1) + ' kg · ' + (delta > 0 ? '+' : '') + round(delta, 1) + ' kg sur ' + humanDuration(days)
+}
+
+// "12 jours" / "3 semaines" / "4 mois" à partir d'un nombre de jours
+function humanDuration(days) {
+  if (days < 14) return days + ' jour' + (days > 1 ? 's' : '')
+  if (days < 60) return Math.round(days / 7) + ' semaines'
+  return Math.round(days / 30) + ' mois'
+}
+
+// "28 septembre" (sans jour de semaine), pour l'historique des pesées
+function formatDateShortFR(dateStr) {
+  const mois = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
+  const d = parseLocalDate(dateStr)
+  return d.getDate() + ' ' + mois[d.getMonth()]
+}
+
+// Courbe SVG du poids dans le temps (espacement régulier entre les points, pas à l'échelle des dates)
+function weightChartSvg(logs) {
+  const W = 320
+  const H = 140
+  const weights = logs.map(l => l.weight)
+  const min = Math.min(...weights)
+  const max = Math.max(...weights)
+  const pad = Math.max(0.5, (max - min) * 0.15)
+  const lo = min - pad
+  const hi = max + pad
+  const x = i => (logs.length === 1 ? W / 2 : 20 + (i * (W - 40)) / (logs.length - 1))
+  const y = w => 15 + (H - 30) * (1 - (w - lo) / (hi - lo))
+
+  let h = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;">'
+  ;[0.25, 0.5, 0.75].forEach(f => {
+    const gy = 15 + (H - 30) * f
+    h += '<line x1="0" y1="' + gy + '" x2="' + W + '" y2="' + gy + '" stroke="var(--border)" stroke-width="1"/>'
+  })
+  if (logs.length > 1) {
+    const points = logs.map((l, i) => round(x(i), 1) + ',' + round(y(l.weight), 1)).join(' ')
+    h += '<polyline points="' + points + '" fill="none" stroke="var(--protein)" stroke-width="2"/>'
+  }
+  logs.forEach((l, i) => {
+    h += '<circle cx="' + round(x(i), 1) + '" cy="' + round(y(l.weight), 1) + '" r="3.5" fill="var(--protein)"/>'
+  })
+  h += '</svg>'
+  return h
+}
+
+function weightPageBody() {
+  const logs = state.weightLogs
+  let h = ''
+
+  h += '<div class="card" style="background:var(--surface-raised);padding:14px;margin-bottom:16px;">'
+  if (logs.length === 0) {
+    h += '<div class="empty" style="padding:20px 10px;">Aucune pesée pour l\'instant. Ajoute la première ci-dessous.</div>'
+  } else {
+    h += '<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">'
+    h += '<span style="font-size:var(--text-h2);font-weight:700;">' + round(logs[logs.length - 1].weight, 1) + ' <span style="font-size:var(--text-small);color:var(--text-muted);font-weight:500;">kg</span></span>'
+    h += '<span style="font-size:var(--text-small);color:var(--text-muted);">' + esc(weightSummaryText().split(' · ')[1] || '') + '</span>'
+    h += '</div>'
+    h += weightChartSvg(logs)
+  }
+  h += '</div>'
+
+  h += '<div class="row2" style="margin-bottom:16px;">'
+  h += '<input type="date" id="wl-date" value="' + todayStr() + '" max="' + todayStr() + '"/>'
+  h += '<input type="number" id="wl-weight" inputmode="decimal" step="0.1" placeholder="Poids (kg)"/>'
+  h += '</div>'
+  h += '<button class="btn primary block" data-action="add-weight-log" style="margin-bottom:20px;">Enregistrer la pesée</button>'
+
+  if (logs.length > 0) {
+    h += '<span class="lbl" style="display:block;margin-bottom:6px;">Historique</span>'
+    h += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">'
+    logs.slice().reverse().forEach((l, idx, arr) => {
+      h += '<div class="list-item" style="padding:12px;' + (idx < arr.length - 1 ? '' : 'border-bottom:none;') + '">'
+      h += '<span>' + formatDateShortFR(l.log_date) + '</span>'
+      h += '<div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;">' + round(l.weight, 1) + ' kg</span>'
+      h += '<button class="icon-btn" data-action="del-weight-log" data-id="' + l.id + '" aria-label="Supprimer cette pesée">✕</button></div>'
+      h += '</div>'
+    })
+    h += '</div>'
+  }
+
+  return h
 }
 
 function objectivesPageBody() {
@@ -2649,12 +2759,42 @@ function handleAction(action, el) {
     state.profilePage = null
     state.modal = null
     render()
-  } else if (action === 'open-objectives' || action === 'open-settings') {
+  } else if (action === 'open-objectives' || action === 'open-settings' || action === 'open-weight') {
     state._profileScrollY = window.scrollY
-    state.profilePage = action === 'open-settings' ? 'settings' : 'objectives'
+    state.profilePage = action === 'open-settings' ? 'settings' : action === 'open-weight' ? 'weight' : 'objectives'
     state.modal = null
     render()
     window.scrollTo(0, 0)
+  } else if (action === 'add-weight-log') {
+    const dateInput = document.getElementById('wl-date')
+    const weightInput = document.getElementById('wl-weight')
+    const logDate = dateInput.value || todayStr()
+    const weight = parseFloat(weightInput.value)
+    if (!weight || weight <= 0) {
+      showToast('Indique un poids')
+      return
+    }
+    const entry = { id: uid(), person_id: state.currentPerson, log_date: logDate, weight }
+    const existingIdx = state.weightLogs.findIndex(l => l.log_date === logDate)
+    if (existingIdx > -1) entry.id = state.weightLogs[existingIdx].id
+    if (existingIdx > -1) state.weightLogs[existingIdx] = entry
+    else state.weightLogs.push(entry)
+    state.weightLogs.sort((a, b) => a.log_date.localeCompare(b.log_date))
+    persist(saveWeightLog(entry))
+    // La cible calorique se base sur la pesée la plus récente
+    const isLatest = state.weightLogs[state.weightLogs.length - 1].log_date === logDate
+    if (isLatest && state.profile) {
+      state.profile.weight = weight
+      persist(saveProfile(state.profile))
+    }
+    weightInput.value = ''
+    render()
+    showToast('Pesée enregistrée')
+  } else if (action === 'del-weight-log') {
+    const id = el.getAttribute('data-id')
+    state.weightLogs = state.weightLogs.filter(l => l.id !== id)
+    persist(deleteWeightLog(id))
+    render()
   } else if (action === 'close-profile-page') {
     state.profilePage = null
     state.modal = null

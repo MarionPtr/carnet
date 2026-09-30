@@ -289,6 +289,46 @@ export async function deleteCategory(name) {
   }
 }
 
+// Charger l'historique de poids d'une personne, du plus ancien au plus récent
+export async function loadWeightLogs(personId) {
+  const { data, error } = await supabase
+    .from('weight_logs')
+    .select('*')
+    .eq('person_id', personId)
+    .order('log_date', { ascending: true })
+
+  if (error) {
+    console.error('Erreur chargement poids:', error)
+    return []
+  }
+  return data || []
+}
+
+// Enregistrer une pesée (remplace celle du même jour si elle existe déjà)
+export async function saveWeightLog(entry) {
+  const { error } = await supabase
+    .from('weight_logs')
+    .upsert([entry], { onConflict: 'person_id,log_date' })
+
+  if (error) {
+    console.error('Erreur enregistrement poids:', error)
+    throw error
+  }
+}
+
+// Supprimer une pesée
+export async function deleteWeightLog(id) {
+  const { error } = await supabase
+    .from('weight_logs')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    console.error('Erreur suppression poids:', error)
+    throw error
+  }
+}
+
 // Charger les familles (regroupements de catégories)
 export async function loadFamilies() {
   const { data, error } = await supabase
