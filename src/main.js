@@ -21,6 +21,9 @@ import {
   loadCategoryFamilies,
   loadWeightLogs,
   loadMealHistory,
+  loadDishes,
+  saveDish,
+  deleteDish,
   saveWeightLog,
   deleteWeightLog,
   addFamily,
@@ -160,6 +163,11 @@ const state = {
   logGrouped: !!savedPrefs.logGrouped, // liste découpée par catégorie (ingrédients) ou par type (recettes)
   logCategory: null, // puce de catégorie active (non mémorisée : elle dépend de l'onglet)
   mealHistory: [], // [{ kind, ref_id, meal }] des 90 derniers jours, pour « Souvent mangés »
+  dishes: [], // plats de la personne courante : [{ id, name, default_meal, items: [{ kind, ref_id, qty }] }]
+  logDish: null, // plat déplié sur la page « Ajouter au journal » : { id, items: [{ kind, ref_id, qty, portionIdx, included }] }
+  _draftDish: null, // brouillon du formulaire de plat : { id, name, default_meal, items }
+  _dishPickerType: 'ingredient',
+  _dishPickerSearch: '',
   logQty: 1, // portions (recette / portion d'ingrédient) ou grammes / ml
   logPortionIdx: null, // null = grammes personnalisés, sinon index dans getIngredientPortions(ing)
   _logScrollY: 0,
@@ -215,6 +223,7 @@ async function init() {
     state.categoryFamily = await loadCategoryFamilies()
     state.recipeTypes = await loadRecipeTypes()
     state.weightLogs = await loadWeightLogs(state.currentPerson)
+    state.dishes = await loadDishes(state.currentPerson)
   } catch (e) {
     console.error('Erreur lors du chargement:', e)
   }
@@ -417,6 +426,7 @@ function renderToday() {
           h += '<div class="actions"><button class="icon-btn" data-action="del-log" data-id="' + log.id + '">✕</button></div>'
           h += '</div>'
         })
+      h += '<button type="button" data-action="save-meal-as-dish" data-meal="' + meal.key + '" style="display:flex;align-items:center;gap:6px;margin:6px 0 0 20px;padding:6px 0;background:none;border:none;color:var(--text-muted);font-size:var(--text-small);cursor:pointer;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z"/></svg>Enregistrer comme plat</button>'
     }
     h += '</div>'
   })
@@ -1207,6 +1217,8 @@ function renderModal() {
   else if (m.type === 'recipe-filter') body = recipeFilterForm()
   else if (m.type === 'recipe-ing-picker') body = recipeIngPickerModal()
   else if (m.type === 'edit-recipe-type') body = editRecipeTypeForm(m.typeIdx)
+  else if (m.type === 'dish-form') body = dishForm()
+  else if (m.type === 'dish-picker') body = dishPickerModal()
 
   return (
     '<div class="modal-backdrop" data-action="close-modal-bg">' +
@@ -1777,14 +1789,228 @@ function logListHtml(type, items) {
   return h + '</div>'
 }
 
+// ========== PLATS (compositions d'ingrédients et de recettes) ==========
+function dishItemRef(it) {
+  return it.kind === 'recipe' ? state.recipes.find(r => r.id === it.ref_id) : state.ingredients.find(i => i.id === it.ref_id)
+}
+
+function dishItemMacros(it) {
+  const ref = dishItemRef(it)
+  if (!ref) return { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+  if (it.kind === 'recipe') {
+    const m = recipeMacrosPerServing(ref, state.ingredients)
+    return { kcal: m.kcal * it.qty, protein: m.protein * it.qty, carbs: m.carbs * it.qty, fat: m.fat * it.qty }
+  }
+  const f = it.qty / 100
+  return { kcal: ref.kcal * f, protein: ref.protein * f, carbs: ref.carbs * f, fat: ref.fat * f }
+}
+
+function dishTotals(items) {
+  const t = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+  items.forEach(it => {
+    if (it.included === false || !dishItemRef(it)) return
+    const m = dishItemMacros(it)
+    t.kcal += m.kcal
+    t.protein += m.protein
+    t.carbs += m.carbs
+    t.fat += m.fat
+  })
+  return t
+}
+
+function dishTotalsHtml(items) {
+  const t = dishTotals(items)
+  return '<span style="font-weight:700;color:var(--text);">' + round(t.kcal) + ' kcal</span> · P ' + round(t.protein) + ' g · G ' + round(t.carbs) + ' g · L ' + round(t.fat) + ' g'
+}
+
+// Élément prêt à être affiché : mode portion détecté pour un ingrédient dont la quantité est un multiple de portion
+function dishWorkItem(it) {
+  const ref = dishItemRef(it)
+  return { kind: it.kind, ref_id: it.ref_id, qty: it.qty, portionIdx: it.kind === 'ingredient' ? detectPortionIdx(ref, it.qty) : null, included: true }
+}
+
+function dishScopeItems(scope) {
+  if (scope === 'log') return state.logDish ? state.logDish.items : null
+  return state._draftDish ? state._draftDish.items : null
+}
+
+// Quantité par défaut d'un nouvel élément : une portion si l'ingrédient en a une, sinon 100 g ; une part pour une recette
+function dishDefaultItem(kind, id) {
+  if (kind === 'recipe') return { kind, ref_id: id, qty: 1, portionIdx: null, included: true }
+  const ing = state.ingredients.find(i => i.id === id)
+  const portions = ing ? getIngredientPortions(ing) : []
+  if (portions.length > 0) return { kind, ref_id: id, qty: portions[0].grams, portionIdx: 0, included: true }
+  return { kind, ref_id: id, qty: 100, portionIdx: null, included: true }
+}
+
+// Retrouve un élément de plat à partir d'une ligne du journal (la quantité est lue dans le nom : « Banane (110g) »)
+function logEntryToDishItem(log) {
+  if (log.kind === 'recipe') {
+    const r = state.recipes.find(x => x.id === log.ref_id)
+    if (!r) return null
+    const m = (log.name || '').match(/\(([\d.,]+)\s*part/)
+    return dishWorkItem({ kind: 'recipe', ref_id: r.id, qty: m ? parseFloat(m[1].replace(',', '.')) || 1 : 1 })
+  }
+  const ing = state.ingredients.find(i => i.id === log.ref_id)
+  if (!ing) return null
+  const m = (log.name || '').match(/\(([\d.,]+)\s*(?:g|ml)\)\s*$/)
+  let qty = m ? parseFloat(m[1].replace(',', '.')) : 0
+  if (!qty && ing.kcal > 0 && log.kcal > 0) qty = round((log.kcal / ing.kcal) * 100, 1)
+  return dishWorkItem({ kind: 'ingredient', ref_id: ing.id, qty: qty || 100 })
+}
+
+// Réglage de la quantité d'un élément : compteur (portions ou parts) ou champ en grammes
+function dishQtyControlHtml(it, idx, scope) {
+  const ref = dishItemRef(it)
+  if (!ref) return ''
+  const stepBtn = 'width:26px;height:26px;padding:0;line-height:1;border-radius:50%;background:var(--surface);color:var(--text);border:1px solid var(--border-strong);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;'
+  const stepper = label =>
+    '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'
+    + '<button type="button" data-action="dish-step" data-scope="' + scope + '" data-idx="' + idx + '" data-delta="-0.5" style="' + stepBtn + '" aria-label="Moins">−</button>'
+    + '<span style="font-size:var(--text-small);min-width:66px;text-align:center;">' + esc(label) + '</span>'
+    + '<button type="button" data-action="dish-step" data-scope="' + scope + '" data-idx="' + idx + '" data-delta="0.5" style="' + stepBtn + '" aria-label="Plus">+</button>'
+    + '</div>'
+  if (it.kind === 'recipe') return stepper(round(it.qty, 2) + ' part' + (it.qty > 1 ? 's' : ''))
+  const portions = getIngredientPortions(ref)
+  const portion = it.portionIdx != null ? portions[it.portionIdx] : null
+  if (portion) return stepper(round(it.qty / portion.grams, 2) + ' ' + portionCountLabel(portion))
+  const unit = ref.unit || 'g'
+  return '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">'
+    + '<input type="number" inputmode="decimal" class="input-sm" data-dish-qty data-scope="' + scope + '" data-idx="' + idx + '" value="' + esc(round(it.qty, 1)) + '" style="width:72px;text-align:right;padding:6px 8px;"/>'
+    + '<span style="font-size:var(--text-small);color:var(--text-muted);">' + esc(unit) + '</span></div>'
+}
+
+// Panneau d'ajustement d'un plat sur la page « Ajouter au journal »
+function dishPanelHtml() {
+  const items = state.logDish.items
+  const check = on => '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="' + (on ? 'var(--protein)' : 'var(--text-muted)') + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/>' + (on ? '<polyline points="8 12.5 11 15.5 16 9"/>' : '') + '</svg>'
+  let h = '<div style="padding:4px 14px 14px;background:var(--surface-raised);border-top:1px solid var(--border);">'
+  items.forEach((it, idx) => {
+    const ref = dishItemRef(it)
+    if (!ref) return
+    const on = it.included !== false
+    h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">'
+    h += '<button type="button" data-action="dish-toggle-item" data-idx="' + idx + '" aria-label="' + (on ? 'Retirer' : 'Inclure') + ' ' + esc(ref.name) + '" style="background:none;border:none;padding:0;display:flex;cursor:pointer;flex-shrink:0;">' + check(on) + '</button>'
+    h += '<div style="flex:1;min-width:0;font-size:var(--text-body);font-weight:500;' + (on ? '' : 'color:var(--text-muted);') + '">' + esc(ref.name) + '</div>'
+    h += on ? dishQtyControlHtml(it, idx, 'log') : '<span style="font-size:var(--text-small);color:var(--text-muted);">retiré aujourd\'hui</span>'
+    h += '</div>'
+  })
+  h += '<div id="dish-total-log" style="text-align:center;font-size:var(--text-body);color:var(--text-muted);margin:12px 0;">' + dishTotalsHtml(items) + '</div>'
+  h += '<button class="btn primary block" data-action="confirm-dish" style="display:flex;align-items:center;justify-content:center;gap:8px;">'
+  h += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12 10 18 20 6"/></svg><span>Ajouter ' + LOG_MEAL_PHRASE[state.logMeal] + '</span></button>'
+  h += '</div>'
+  return h
+}
+
+// Vignette d'un plat : mosaïque des images de ses éléments
+function dishMosaicHtml(dish) {
+  const refs = dish.items.map(it => ({ kind: it.kind, ref: dishItemRef(it) })).filter(x => x.ref).slice(0, 4)
+  if (refs.length === 0) return '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:24px;">🍱</div>'
+  const cols = refs.length === 1 ? 1 : 2
+  const rows = refs.length <= 2 ? 1 : 2
+  let h = '<div style="width:100%;height:100%;display:grid;grid-template-columns:repeat(' + cols + ',1fr);grid-template-rows:repeat(' + rows + ',1fr);gap:2px;">'
+  refs.forEach(x => { h += '<div style="overflow:hidden;min-width:0;min-height:0;">' + logThumbHtml(x.kind, x.ref) + '</div>' })
+  return h + '</div>'
+}
+
+function logDishRowHtml(dish, expanded) {
+  const valid = dish.items.filter(it => dishItemRef(it))
+  const kcal = round(dishTotals(valid.map(it => ({ ...it, included: true }))).kcal)
+  let h = '<div>'
+  h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px 10px 12px;">'
+  h += '<div style="width:56px;height:56px;flex-shrink:0;border-radius:14px;overflow:hidden;background:var(--surface-raised);border:1px solid var(--border);">' + dishMosaicHtml(dish) + '</div>'
+  h += '<div style="flex:1;min-width:0;">'
+  h += '<div style="font-size:var(--text-h3);font-weight:600;line-height:1.3;">' + esc(dish.name) + '</div>'
+  h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + valid.length + ' élément' + (valid.length > 1 ? 's' : '') + ' · ' + kcal + ' kcal</div>'
+  h += '</div>'
+  h += '<button type="button" data-action="edit-dish" data-id="' + dish.id + '" title="Modifier le plat" aria-label="Modifier ' + esc(dish.name) + '" class="icon-btn" style="display:flex;padding:6px;flex-shrink:0;">' + iconPencilSmall() + '</button>'
+  h += '<button data-action="toggle-log-dish" data-id="' + dish.id + '" title="Ajouter" aria-label="Ajouter ' + esc(dish.name) + '" style="width:40px;height:40px;flex-shrink:0;padding:0;line-height:1;border-radius:50%;background:' + (expanded ? 'var(--protein)' : 'var(--surface-raised)') + ';border:1px solid var(--border-strong);color:' + (expanded ? '#221705' : 'var(--text)') + ';font-size:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;"><span style="display:block;transition:transform .15s ease;transform:rotate(' + (expanded ? '45deg' : '0deg') + ');">+</span></button>'
+  h += '</div>'
+  if (expanded) h += dishPanelHtml()
+  h += '</div>'
+  return h
+}
+
+// Contenu de l'onglet « Plat » de la page « Ajouter au journal »
+function logDishSectionHtml(q) {
+  let list = state.dishes.filter(d => !q || d.name.toLowerCase().indexOf(q) > -1)
+  list = list.slice().sort((a, b) => (b.default_meal === state.logMeal) - (a.default_meal === state.logMeal) || a.name.localeCompare(b.name))
+  let h = '<button type="button" data-action="new-dish" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;margin-bottom:14px;background:none;border:1px dashed var(--border-strong);border-radius:14px;color:var(--text-muted);font-size:var(--text-body);cursor:pointer;"><span style="font-size:18px;line-height:1;">+</span>Nouveau plat</button>'
+  if (state.dishes.length === 0) {
+    return h + '<div class="empty">Un plat regroupe des ingrédients et des recettes avec leurs quantités, pour les ajouter d\'un coup. Crée-en un ici, ou depuis un repas de ton journal avec « Enregistrer comme plat ».</div>'
+  }
+  if (list.length === 0) return h + '<div class="empty">Aucun résultat.</div>'
+  h += '<div style="background:var(--surface);border-radius:22px;overflow:hidden;">'
+  list.forEach((d, idx) => {
+    h += logDishRowHtml(d, !!state.logDish && state.logDish.id === d.id)
+    if (idx < list.length - 1) h += '<div style="height:1px;background:var(--border);margin-left:80px;"></div>'
+  })
+  return h + '</div>'
+}
+
+// Formulaire de création / modification d'un plat
+function dishForm() {
+  const d = state._draftDish
+  const editing = !!d.id
+  let h = '<h2>' + (editing ? 'Modifier le plat' : 'Nouveau plat') + '</h2>'
+  h += '<label class="field"><span class="lbl">Nom <span style="color:var(--danger);">*</span></span><input id="df-name" value="' + esc(d.name) + '" placeholder="ex. Petit-déj habituel" autocomplete="off"/></label>'
+  d.items.forEach((it, idx) => {
+    const ref = dishItemRef(it)
+    if (!ref) return
+    h += '<div style="background:var(--surface-raised);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;">'
+    h += '<div style="width:40px;height:40px;flex-shrink:0;border-radius:8px;overflow:hidden;background:var(--surface);border:1px solid var(--border);">' + logThumbHtml(it.kind, ref) + '</div>'
+    h += '<div style="flex:1;min-width:0;font-size:var(--text-body);font-weight:500;line-height:1.3;">' + esc(ref.name) + '</div>'
+    h += dishQtyControlHtml(it, idx, 'form')
+    h += '<button type="button" class="icon-btn" data-action="dish-remove-item" data-idx="' + idx + '" aria-label="Retirer ' + esc(ref.name) + '" style="flex-shrink:0;">✕</button>'
+    h += '</div>'
+  })
+  h += '<button type="button" data-action="dish-add-item" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;margin:2px 0 14px;background:none;border:1px dashed var(--border-strong);border-radius:10px;color:var(--text-muted);font-size:var(--text-body);cursor:pointer;"><span style="font-size:18px;line-height:1;">+</span>Ajouter un élément</button>'
+  if (d.items.length > 0) h += '<div class="card" style="background:var(--surface-raised);text-align:center;font-size:var(--text-body);color:var(--text-muted);margin-bottom:14px;"><div id="dish-total-form">' + dishTotalsHtml(d.items) + '</div></div>'
+  const ready = d.name.trim().length > 0 && d.items.length > 0
+  h += '<div style="display:flex;gap:10px;align-items:stretch;">'
+  if (editing) h += '<button type="button" class="btn danger-outline" data-action="del-dish" data-id="' + d.id + '" title="Supprimer le plat" aria-label="Supprimer le plat" style="flex-shrink:0;width:52px;display:flex;align-items:center;justify-content:center;padding:0;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>'
+  h += '<button class="btn primary" id="save-dish-btn" data-action="save-dish" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;"' + (ready ? '' : ' disabled') + '><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span>Enregistrer</span></button>'
+  h += '</div>'
+  h += '<div id="save-dish-hint" style="text-align:center;color:var(--text-muted);font-size:var(--text-small);margin-top:8px;' + (ready ? 'display:none;' : '') + '">' + (d.name.trim() ? 'Ajoute au moins un élément.' : 'Donne un nom au plat pour pouvoir l\'enregistrer.') + '</div>'
+  return h
+}
+
+// Sélecteur d'éléments (ingrédients ou recettes) à ajouter à un plat
+function dishPickerModal() {
+  const q = state._dishPickerSearch.trim().toLowerCase()
+  const type = state._dishPickerType === 'recipe' ? 'recipe' : 'ingredient'
+  const items = (type === 'recipe'
+    ? state.recipes.filter(r => !q || r.name.toLowerCase().indexOf(q) > -1)
+    : state.ingredients.filter(i => !q || ingMatchesSearch(i, q))
+  ).slice().sort((a, b) => a.name.localeCompare(b.name))
+  let h = '<h2>Ajouter un élément</h2>'
+  h += '<div class="segmented" style="margin-bottom:12px;">'
+  h += '<button type="button" class="' + (type === 'ingredient' ? 'active' : '') + '" data-action="set-dish-picker-type" data-type="ingredient" style="font-size:var(--text-body);">Ingrédient</button>'
+  h += '<button type="button" class="' + (type === 'recipe' ? 'active' : '') + '" data-action="set-dish-picker-type" data-type="recipe" style="font-size:var(--text-body);">Recette</button>'
+  h += '</div>'
+  h += '<div class="search-wrap" style="position:relative;">'
+  h += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);pointer-events:none;"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>'
+  h += '<input id="dish-picker-search" class="search-ios" type="search" placeholder="Rechercher" value="' + esc(state._dishPickerSearch) + '"/></div>'
+  if (items.length === 0) return h + '<div class="empty">Aucun résultat.</div>'
+  h += '<div style="background:var(--surface-raised);border-radius:16px;overflow:hidden;">'
+  items.forEach((item, idx) => {
+    const sub = type === 'recipe' ? '' : ((item.brands && item.brands.length > 0) ? esc(item.brands.join(', ')) : '')
+    h += '<div data-action="pick-dish-item" data-kind="' + type + '" data-id="' + item.id + '" style="display:flex;align-items:center;gap:12px;padding:8px 12px;cursor:pointer;' + (idx < items.length - 1 ? 'border-bottom:1px solid var(--border);' : '') + '">'
+    h += '<div style="width:44px;height:44px;flex-shrink:0;border-radius:10px;overflow:hidden;background:var(--surface);border:1px solid var(--border);">' + logThumbHtml(type, item) + '</div>'
+    h += '<div style="flex:1;min-width:0;"><div style="font-size:var(--text-body);font-weight:500;">' + esc(item.name) + '</div>' + (sub ? '<div style="font-size:var(--text-small);color:var(--text-muted);">' + sub + '</div>' : '') + '</div>'
+    h += '</div>'
+  })
+  return h + '</div>'
+}
+
 function renderLogPage() {
   const q = state.logSearch.trim().toLowerCase()
-  const type = state.logType === 'recipe' ? 'recipe' : 'ingredient'
+  const type = state.logType === 'recipe' ? 'recipe' : state.logType === 'dish' ? 'dish' : 'ingredient'
   const favOnly = state.logFavOnly
   const byName = (a, b) => a.name.localeCompare(b.name)
 
   // Puces de catégorie : celles qui existent vraiment dans l'onglet affiché
-  const pool = type === 'recipe' ? state.recipes : state.ingredients
+  const pool = type === 'recipe' ? state.recipes : type === 'dish' ? [] : state.ingredients
   const groups = Array.from(new Set(pool.map(i => logItemGroup(type, i)))).sort((a, b) => a.localeCompare(b))
   if (state.logCategory && !groups.includes(state.logCategory)) state.logCategory = null
 
@@ -1821,28 +2047,36 @@ function renderLogPage() {
     h += '<button class="icon-btn" data-action="clear-log-search" aria-label="Effacer la recherche" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:22px;height:22px;padding:0;border-radius:50%;background:var(--text-muted);color:var(--bg);font-size:12px;line-height:22px;display:flex;align-items:center;justify-content:center;">✕</button>'
   }
   h += '</div>'
-  h += '<button type="button" data-action="toggle-log-grouped" title="' + (type === 'recipe' ? 'Afficher par type' : 'Afficher par famille') + '" aria-label="' + (type === 'recipe' ? 'Afficher par type' : 'Afficher par famille') + '" aria-pressed="' + state.logGrouped + '" style="width:43px;height:43px;flex-shrink:0;padding:0;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;background:' + (state.logGrouped ? 'var(--protein)' : 'var(--seg-track)') + ';color:' + (state.logGrouped ? '#221705' : 'var(--text)') + ';">'
-  h += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg></button>'
+  if (type !== 'dish') {
+    h += '<button type="button" data-action="toggle-log-grouped" title="' + (type === 'recipe' ? 'Afficher par type' : 'Afficher par famille') + '" aria-label="' + (type === 'recipe' ? 'Afficher par type' : 'Afficher par famille') + '" aria-pressed="' + state.logGrouped + '" style="width:43px;height:43px;flex-shrink:0;padding:0;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;background:' + (state.logGrouped ? 'var(--protein)' : 'var(--seg-track)') + ';color:' + (state.logGrouped ? '#221705' : 'var(--text)') + ';">'
+    h += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg></button>'
+  }
   h += '</div>'
 
   // Puces : favoris, puis une par catégorie
-  h += '<div class="chips">'
-  h += '<button type="button" class="chip' + (favOnly ? ' active' : '') + '" data-action="toggle-log-fav">★ Favoris</button>'
-  groups.forEach(g => {
-    h += '<button type="button" class="chip' + (state.logCategory === g ? ' active' : '') + '" data-action="set-log-category" data-cat="' + esc(g) + '">' + esc(g) + '</button>'
-  })
-  h += '</div>'
+  if (type !== 'dish') {
+    h += '<div class="chips">'
+    h += '<button type="button" class="chip' + (favOnly ? ' active' : '') + '" data-action="toggle-log-fav">★ Favoris</button>'
+    groups.forEach(g => {
+      h += '<button type="button" class="chip' + (state.logCategory === g ? ' active' : '') + '" data-action="set-log-category" data-cat="' + esc(g) + '">' + esc(g) + '</button>'
+    })
+    h += '</div>'
+  }
 
   const count = n => (q ? ' (' + n + ')' : '')
+  const dishCount = state.dishes.filter(d => !q || d.name.toLowerCase().indexOf(q) > -1).length
   h += '<div class="segmented" style="margin-bottom:14px;">'
   h += '<button type="button" class="' + (type === 'ingredient' ? 'active' : '') + '" data-action="set-log-type" data-type="ingredient" style="font-size:var(--text-body);">Ingrédient' + count(ingredients.length) + '</button>'
   h += '<button type="button" class="' + (type === 'recipe' ? 'active' : '') + '" data-action="set-log-type" data-type="recipe" style="font-size:var(--text-body);">Recette' + count(recipes.length) + '</button>'
+  h += '<button type="button" class="' + (type === 'dish' ? 'active' : '') + '" data-action="set-log-type" data-type="dish" style="font-size:var(--text-body);">Plat' + count(dishCount) + '</button>'
   h += '</div>'
 
   // Raccourcis « Souvent mangés » : seulement sans recherche ni filtre
-  if (!q && !favOnly && !state.logCategory) h += logFrequentHtml(type)
+  if (type !== 'dish' && !q && !favOnly && !state.logCategory) h += logFrequentHtml(type)
 
-  if (list.length === 0) {
+  if (type === 'dish') {
+    h += logDishSectionHtml(q)
+  } else if (list.length === 0) {
     const none = q ? 'Aucun résultat.' : favOnly ? 'Aucun favori ici pour l\'instant.' : state.logCategory ? (type === 'recipe' ? 'Rien dans ce type.' : 'Rien dans cette famille.') : (type === 'recipe' ? 'Aucune recette pour l\'instant.' : 'Aucun ingrédient pour l\'instant.')
     h += '<div class="empty">' + none + '</div>'
   } else if (state.logGrouped) {
@@ -2435,6 +2669,52 @@ function bindEvents() {
   }
 
   bindCustomMacroInputs()
+
+  // Nom du plat : met à jour le brouillon et l'état du bouton sans réafficher la fenêtre
+  const dishNameInput = document.getElementById('df-name')
+  if (dishNameInput) {
+    dishNameInput.addEventListener('input', () => {
+      if (!state._draftDish) return
+      state._draftDish.name = dishNameInput.value
+      const ready = dishNameInput.value.trim().length > 0 && state._draftDish.items.length > 0
+      const btn = document.getElementById('save-dish-btn')
+      const hint = document.getElementById('save-dish-hint')
+      if (btn) btn.disabled = !ready
+      if (hint) {
+        hint.style.display = ready ? 'none' : 'block'
+        hint.textContent = dishNameInput.value.trim() ? 'Ajoute au moins un élément.' : 'Donne un nom au plat pour pouvoir l\'enregistrer.'
+      }
+    })
+  }
+
+  // Quantité en grammes d'un élément de plat : mise à jour du total sans réafficher (le clavier reste ouvert)
+  app.querySelectorAll('[data-dish-qty]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const scope = inp.getAttribute('data-scope')
+      const items = dishScopeItems(scope)
+      const it = items && items[parseInt(inp.getAttribute('data-idx'))]
+      if (!it) return
+      it.qty = parseFloat(inp.value) || 0
+      const total = document.getElementById('dish-total-' + scope)
+      if (total) total.innerHTML = dishTotalsHtml(items)
+    })
+  })
+
+  // Recherche du sélecteur d'éléments d'un plat
+  const dishPickerSearch = document.getElementById('dish-picker-search')
+  if (dishPickerSearch) {
+    dishPickerSearch.addEventListener('input', () => {
+      state._dishPickerSearch = dishPickerSearch.value
+      render()
+      setTimeout(() => {
+        const el = document.getElementById('dish-picker-search')
+        if (el) {
+          el.focus()
+          el.selectionStart = el.selectionEnd = el.value.length
+        }
+      }, 0)
+    })
+  }
 
   // Recherche de la page « Ajouter au journal »
   const logSearchInput = document.getElementById('log-search')
@@ -3327,8 +3607,129 @@ function handleAction(action, el) {
     state.logGrouped = !state.logGrouped
     state.logExpanded = null
     render()
+  } else if (action === 'toggle-log-dish') {
+    const id = el.getAttribute('data-id')
+    if (state.logDish && state.logDish.id === id) {
+      state.logDish = null
+    } else {
+      const dish = state.dishes.find(d => d.id === id)
+      state.logDish = dish ? { id, items: dish.items.map(it => dishWorkItem(it)).filter(it => dishItemRef(it)) } : null
+    }
+    render()
+  } else if (action === 'dish-toggle-item') {
+    const it = state.logDish && state.logDish.items[parseInt(el.getAttribute('data-idx'))]
+    if (!it) return
+    it.included = it.included === false
+    render()
+  } else if (action === 'dish-step') {
+    const items = dishScopeItems(el.getAttribute('data-scope'))
+    const it = items && items[parseInt(el.getAttribute('data-idx'))]
+    if (!it) return
+    const delta = parseFloat(el.getAttribute('data-delta')) || 0
+    if (it.kind === 'recipe') {
+      it.qty = Math.max(0.5, round(it.qty + delta, 2))
+    } else {
+      const ing = dishItemRef(it)
+      const portion = ing && it.portionIdx != null ? getIngredientPortions(ing)[it.portionIdx] : null
+      if (portion) it.qty = round(Math.max(0.5, it.qty / portion.grams + delta) * portion.grams, 2)
+    }
+    render()
+  } else if (action === 'confirm-dish') {
+    const items = state.logDish ? state.logDish.items.filter(it => it.included !== false && it.qty > 0 && dishItemRef(it)) : []
+    if (items.length === 0) {
+      showToast('Garde au moins un élément')
+      return
+    }
+    items.forEach(it => {
+      if (it.kind === 'recipe') logRecipe(it.ref_id, it.qty)
+      else logIngredient(it.ref_id, it.qty)
+      state.mealHistory.push({ kind: it.kind, ref_id: it.ref_id, meal: state.logMeal })
+    })
+    state.logDish = null
+    showToast('Plat ajouté au journal')
+  } else if (action === 'new-dish') {
+    state._draftDish = { id: null, name: '', default_meal: null, items: [] }
+    state.modal = { type: 'dish-form' }
+    render()
+  } else if (action === 'edit-dish') {
+    const dish = state.dishes.find(d => d.id === el.getAttribute('data-id'))
+    if (!dish) return
+    state._draftDish = { id: dish.id, name: dish.name, default_meal: dish.default_meal || null, items: dish.items.map(it => dishWorkItem(it)).filter(it => dishItemRef(it)) }
+    state.modal = { type: 'dish-form' }
+    render()
+  } else if (action === 'save-meal-as-dish') {
+    const meal = el.getAttribute('data-meal')
+    const items = state.logs.filter(l => (l.meal || 'snacks') === meal).map(logEntryToDishItem).filter(Boolean)
+    if (items.length === 0) {
+      showToast('Rien à enregistrer dans ce repas')
+      return
+    }
+    state._draftDish = { id: null, name: '', default_meal: meal, items }
+    state.modal = { type: 'dish-form' }
+    render()
+    setTimeout(() => { const n = document.getElementById('df-name'); if (n) n.focus() }, 50)
+  } else if (action === 'dish-remove-item') {
+    if (!state._draftDish) return
+    state._draftDish.items.splice(parseInt(el.getAttribute('data-idx')), 1)
+    render()
+  } else if (action === 'dish-add-item') {
+    state._dishPickerType = 'ingredient'
+    state._dishPickerSearch = ''
+    state.modal = { type: 'dish-picker' }
+    render()
+  } else if (action === 'set-dish-picker-type') {
+    state._dishPickerType = el.getAttribute('data-type')
+    render()
+  } else if (action === 'pick-dish-item') {
+    if (!state._draftDish) return
+    state._draftDish.items.push(dishDefaultItem(el.getAttribute('data-kind'), el.getAttribute('data-id')))
+    state.modal = { type: 'dish-form' }
+    render()
+  } else if (action === 'save-dish') {
+    const d = state._draftDish
+    if (!d) return
+    const name = d.name.trim()
+    if (!name) {
+      showToast('Donne un nom au plat')
+      return
+    }
+    const items = d.items.filter(it => dishItemRef(it))
+    if (items.length === 0) {
+      showToast('Ajoute au moins un élément')
+      return
+    }
+    if (state.dishes.some(x => x.id !== d.id && x.name.trim().toLowerCase() === name.toLowerCase())) {
+      showToast('Un plat porte déjà ce nom')
+      return
+    }
+    const dish = {
+      id: d.id || uid(),
+      person_id: state.currentPerson,
+      name,
+      default_meal: d.default_meal || null,
+      items: items.map(it => ({ kind: it.kind, ref_id: it.ref_id, qty: round(it.qty, 2) }))
+    }
+    const idx = state.dishes.findIndex(x => x.id === dish.id)
+    if (idx > -1) state.dishes[idx] = dish
+    else state.dishes.push(dish)
+    state.dishes.sort((a, b) => a.name.localeCompare(b.name))
+    persist(saveDish(dish))
+    if (state.logDish && state.logDish.id === dish.id) state.logDish = null
+    state.modal = null
+    state._draftDish = null
+    render()
+    showToast('Plat enregistré')
+  } else if (action === 'del-dish') {
+    const id = el.getAttribute('data-id')
+    state.dishes = state.dishes.filter(x => x.id !== id)
+    if (state.logDish && state.logDish.id === id) state.logDish = null
+    persist(deleteDish(id))
+    state.modal = null
+    state._draftDish = null
+    render()
   } else if (action === 'set-log-type') {
     state.logType = el.getAttribute('data-type')
+    state.logDish = null
     state.logCategory = null
     state.logExpanded = null
     render()
@@ -3522,14 +3923,22 @@ function handleAction(action, el) {
     persist(deleteRecipeType(name))
     render()
   } else if (action === 'close-modal' || action === 'close-modal-bg') {
-    if (state.modal && state.modal.type === 'recipe-ing-picker') {
-      state.modal = { type: 'add-recipe', editId: state._draftRecipe ? state._draftRecipe.__for : null }
-    } else {
-      state.modal = null
-      state._draftRecipe = null
-    }
-    render()
+    closeModal()
   }
+}
+
+// Ferme la fenêtre ouverte ; depuis un sélecteur d'éléments, revient au formulaire qui l'a ouvert
+function closeModal() {
+  if (state.modal && state.modal.type === 'recipe-ing-picker') {
+    state.modal = { type: 'add-recipe', editId: state._draftRecipe ? state._draftRecipe.__for : null }
+  } else if (state.modal && state.modal.type === 'dish-picker') {
+    state.modal = { type: 'dish-form' }
+  } else {
+    state.modal = null
+    state._draftRecipe = null
+    state._draftDish = null
+  }
+  render()
 }
 
 function logRecipe(recipeId, servings) {
@@ -3579,13 +3988,7 @@ function logIngredient(ingId, grams) {
 // Click outside modal
 document.addEventListener('click', ev => {
   if (ev.target && ev.target.getAttribute && ev.target.getAttribute('data-action') === 'close-modal-bg') {
-    if (state.modal && state.modal.type === 'recipe-ing-picker') {
-      state.modal = { type: 'add-recipe', editId: state._draftRecipe ? state._draftRecipe.__for : null }
-    } else {
-      state.modal = null
-      state._draftRecipe = null
-    }
-    render()
+    closeModal()
   }
 })
 

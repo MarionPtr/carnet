@@ -289,6 +289,46 @@ export async function deleteCategory(name) {
   }
 }
 
+// Charger les plats (compositions d'ingrédients et de recettes) d'une personne
+export async function loadDishes(personId) {
+  const { data, error } = await supabase
+    .from('dishes')
+    .select('*')
+    .eq('person_id', personId)
+    .order('name')
+
+  if (error) {
+    console.error('Erreur chargement plats:', error)
+    return []
+  }
+  return data || []
+}
+
+// Enregistrer un plat (création ou modification)
+export async function saveDish(dish) {
+  const { error } = await supabase
+    .from('dishes')
+    .upsert([dish], { onConflict: 'id' })
+
+  if (error) {
+    console.error('Erreur enregistrement plat:', error)
+    throw error
+  }
+}
+
+// Supprimer un plat
+export async function deleteDish(id) {
+  const { error } = await supabase
+    .from('dishes')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    console.error('Erreur suppression plat:', error)
+    throw error
+  }
+}
+
 // Historique léger du journal d'une personne depuis une date (sert à repérer ce qu'elle mange le plus à chaque repas)
 export async function loadMealHistory(personId, sinceDateStr) {
   const { data, error } = await supabase
