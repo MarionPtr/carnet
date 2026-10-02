@@ -1702,8 +1702,13 @@ function logQuantityPanelHtml(kind, item) {
 
 const LOG_MEAL_PHRASE = { 'petit-dej': 'au petit-déjeuner', dejeuner: 'au déjeuner', diner: 'au dîner', snacks: 'en snack' }
 
+// Regroupement de la page « Ajouter au journal » : le type pour une recette, la famille pour un ingrédient
+// (à défaut de familles définies, on retombe sur la catégorie)
 function logItemGroup(type, item) {
-  return type === 'recipe' ? (item.type || 'Sans type') : (item.category || 'Sans catégorie')
+  if (type === 'recipe') return item.type || 'Sans type'
+  if (state.families.length === 0) return item.category || 'Sans catégorie'
+  const family = state.families.find(f => f.id === state.categoryFamily[item.category])
+  return family ? family.name : 'Sans famille'
 }
 
 function logIsExpanded(type, id, from) {
@@ -1816,7 +1821,7 @@ function renderLogPage() {
     h += '<button class="icon-btn" data-action="clear-log-search" aria-label="Effacer la recherche" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:22px;height:22px;padding:0;border-radius:50%;background:var(--text-muted);color:var(--bg);font-size:12px;line-height:22px;display:flex;align-items:center;justify-content:center;">✕</button>'
   }
   h += '</div>'
-  h += '<button type="button" data-action="toggle-log-grouped" title="Afficher par catégorie" aria-label="Afficher par catégorie" aria-pressed="' + state.logGrouped + '" style="width:43px;height:43px;flex-shrink:0;padding:0;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;background:' + (state.logGrouped ? 'var(--protein)' : 'var(--seg-track)') + ';color:' + (state.logGrouped ? '#221705' : 'var(--text)') + ';">'
+  h += '<button type="button" data-action="toggle-log-grouped" title="' + (type === 'recipe' ? 'Afficher par type' : 'Afficher par famille') + '" aria-label="' + (type === 'recipe' ? 'Afficher par type' : 'Afficher par famille') + '" aria-pressed="' + state.logGrouped + '" style="width:43px;height:43px;flex-shrink:0;padding:0;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;background:' + (state.logGrouped ? 'var(--protein)' : 'var(--seg-track)') + ';color:' + (state.logGrouped ? '#221705' : 'var(--text)') + ';">'
   h += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg></button>'
   h += '</div>'
 
@@ -1838,7 +1843,7 @@ function renderLogPage() {
   if (!q && !favOnly && !state.logCategory) h += logFrequentHtml(type)
 
   if (list.length === 0) {
-    const none = q ? 'Aucun résultat.' : favOnly ? 'Aucun favori ici pour l\'instant.' : state.logCategory ? 'Rien dans cette catégorie.' : (type === 'recipe' ? 'Aucune recette pour l\'instant.' : 'Aucun ingrédient pour l\'instant.')
+    const none = q ? 'Aucun résultat.' : favOnly ? 'Aucun favori ici pour l\'instant.' : state.logCategory ? (type === 'recipe' ? 'Rien dans ce type.' : 'Rien dans cette famille.') : (type === 'recipe' ? 'Aucune recette pour l\'instant.' : 'Aucun ingrédient pour l\'instant.')
     h += '<div class="empty">' + none + '</div>'
   } else if (state.logGrouped) {
     const byGroup = {}
