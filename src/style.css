@@ -13,6 +13,8 @@
   --danger:#D06A60;
   --nav-bg: rgba(31,31,31,0.92);
   --track-bg: rgba(255,255,255,0.06);
+  --seg-track:#1C1C1E;
+  --seg-thumb:#3A3A3C;
   --radius: 14px;
 
   --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
@@ -42,6 +44,8 @@
   --danger:#C23B2E;
   --nav-bg: rgba(247,246,243,0.92);
   --track-bg: rgba(0,0,0,0.06);
+  --seg-track:#EFEDE7;
+  --seg-thumb:#FFFFFF;
 }
 
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -113,6 +117,10 @@ input, select, textarea{
 input:focus, select:focus, textarea:focus{ outline:none; border-color:var(--protein); }
 /* Champs à texte plus petit (nom, marque, liens, portions) : même taille que les libellés */
 .input-sm{ font-size:var(--text-small); }
+
+/* Barre de recherche façon iOS : pilule grise, loupe à gauche */
+.search-ios{ background:var(--seg-track); border:1px solid transparent; border-radius:999px; padding:10px 40px 10px 40px; -webkit-appearance:none; appearance:none; }
+.search-ios::-webkit-search-cancel-button{ -webkit-appearance:none; display:none; }
 label.field, div.field{ display:block; margin-bottom:10px; }
 label.field .lbl, div.field .lbl{ display:block; font-size:var(--text-small); color:var(--text-muted); margin-bottom:5px; }
 .row2{ display:flex; gap:8px; }
@@ -195,10 +203,10 @@ nav.tabs button.active{ color:var(--kcal); background:var(--surface-raised); }
 .ing-line select{ flex:2; }
 .ing-line input{ flex:1; }
 
-.segmented{ display:flex; background:var(--bg); border:1px solid var(--border-strong); border-radius:10px; padding:3px; }
-.segmented button{ flex:1; background:none; border:none; color:var(--text-muted); padding:7px 4px; font-size:var(--text-small); border-radius:8px; }
-.segmented button.active{ background:var(--surface-raised); color:var(--text); }
-.segmented.small{ padding:2px; border-radius:8px; flex-shrink:0; }
+.segmented{ display:flex; background:var(--seg-track); border:none; border-radius:999px; padding:3px; }
+.segmented button{ flex:1; background:none; border:none; color:var(--text-muted); padding:8px 4px; font-size:var(--text-small); font-weight:500; border-radius:999px; transition:background .18s ease, color .18s ease, box-shadow .18s ease; }
+.segmented button.active{ background:var(--seg-thumb); color:var(--text); font-weight:600; box-shadow:0 1px 4px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.04); }
+.segmented.small{ padding:2px; flex-shrink:0; }
 .segmented.small button{ flex:none; padding:3px 12px; }
 
 /* Ligne « Valeurs nutritionnelles pour 100 » + choix g / ml */

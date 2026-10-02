@@ -148,7 +148,7 @@ const state = {
   recipeFavoritesOnly: !!savedPrefs.recipeFavoritesOnly,
   collapsedRecipeTypes: savedPrefs.collapsedRecipeTypes || {},
   logPage: false, // page « Ajouter au journal » ouverte
-  logType: 'recipe',
+  logType: 'ingredient',
   logMeal: 'petit-dej',
   logSearch: '',
   logExpanded: null, // { kind: 'recipe' | 'ingredient', id } : ligne dont le panneau de quantité est ouvert
@@ -1694,7 +1694,7 @@ function logQuantityPanelHtml(kind, item) {
 
 function renderLogPage() {
   const q = state.logSearch.trim().toLowerCase()
-  const type = state.logType === 'ingredient' ? 'ingredient' : 'recipe'
+  const type = state.logType === 'recipe' ? 'recipe' : 'ingredient'
   const recipes = state.recipes.filter(r => !q || r.name.toLowerCase().indexOf(q) > -1).sort((a, b) => a.name.localeCompare(b.name))
   const ingredients = state.ingredients.filter(i => !q || ingMatchesSearch(i, q)).sort((a, b) => a.name.localeCompare(b.name))
   const list = type === 'recipe' ? recipes : ingredients
@@ -1706,38 +1706,40 @@ function renderLogPage() {
   h += '</header>'
 
   h += '<section style="padding-bottom:32px;">'
-  h += '<label class="field"><span class="lbl">Repas</span><select id="log-meal">'
+  h += '<div class="field"><span class="lbl">Repas</span>'
+  h += '<div class="segmented" id="log-meal">'
   MEALS.forEach(meal => {
-    h += '<option value="' + meal.key + '" ' + (state.logMeal === meal.key ? 'selected' : '') + '>' + meal.label + '</option>'
+    h += '<button type="button" class="' + (state.logMeal === meal.key ? 'active' : '') + '" data-action="set-log-meal" data-meal="' + meal.key + '" style="white-space:nowrap;padding:7px 2px;">' + meal.label + '</button>'
   })
-  h += '</select></label>'
+  h += '</div></div>'
 
   h += '<div class="search-wrap" style="position:relative;">'
-  h += '<input id="log-search" placeholder="Rechercher une recette ou un ingrédient…" value="' + esc(state.logSearch) + '" style="' + (state.logSearch ? 'padding-right:36px;' : '') + '"/>'
+  h += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);pointer-events:none;"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>'
+  h += '<input id="log-search" class="search-ios" type="search" placeholder="Rechercher" value="' + esc(state.logSearch) + '"/>'
   if (state.logSearch) {
-    h += '<button class="icon-btn" data-action="clear-log-search" aria-label="Effacer la recherche" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:var(--text-h3);">✕</button>'
+    h += '<button class="icon-btn" data-action="clear-log-search" aria-label="Effacer la recherche" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:22px;height:22px;padding:0;border-radius:50%;background:var(--text-muted);color:var(--bg);font-size:12px;line-height:22px;display:flex;align-items:center;justify-content:center;">✕</button>'
   }
   h += '</div>'
 
   const count = n => (q ? ' (' + n + ')' : '')
   h += '<div class="segmented" style="margin-bottom:14px;">'
-  h += '<button type="button" class="' + (type === 'recipe' ? 'active' : '') + '" data-action="set-log-type" data-type="recipe" style="font-size:var(--text-body);">Recette' + count(recipes.length) + '</button>'
   h += '<button type="button" class="' + (type === 'ingredient' ? 'active' : '') + '" data-action="set-log-type" data-type="ingredient" style="font-size:var(--text-body);">Ingrédient' + count(ingredients.length) + '</button>'
+  h += '<button type="button" class="' + (type === 'recipe' ? 'active' : '') + '" data-action="set-log-type" data-type="recipe" style="font-size:var(--text-body);">Recette' + count(recipes.length) + '</button>'
   h += '</div>'
 
   if (list.length === 0) {
     const none = q ? 'Aucun résultat.' : (type === 'recipe' ? 'Aucune recette pour l\'instant.' : 'Aucun ingrédient pour l\'instant.')
     h += '<div class="empty">' + none + '</div>'
   } else {
-    h += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">'
+    h += '<div style="background:var(--surface);border-radius:22px;overflow:hidden;">'
     list.forEach((item, idx) => {
       const expanded = !!state.logExpanded && state.logExpanded.kind === type && state.logExpanded.id === item.id
       const sub = type === 'recipe'
         ? round(recipeMacrosPerServing(item, state.ingredients).kcal) + ' kcal / part'
         : ((item.brands && item.brands.length > 0) ? esc(item.brands.join(', ')) : '')
-      h += '<div style="' + (idx < list.length - 1 || expanded ? 'border-bottom:1px solid var(--border);' : '') + '">'
-      h += '<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;">'
-      h += '<div style="width:56px;height:56px;flex-shrink:0;border-radius:10px;overflow:hidden;background:var(--surface-raised);border:1px solid var(--border);">' + logThumbHtml(type, item) + '</div>'
+      h += '<div>'
+      h += '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px 10px 12px;">'
+      h += '<div style="width:56px;height:56px;flex-shrink:0;border-radius:14px;overflow:hidden;background:var(--surface-raised);border:1px solid var(--border);">' + logThumbHtml(type, item) + '</div>'
       h += '<div style="flex:1;min-width:0;">'
       h += '<div style="font-size:var(--text-h3);font-weight:600;line-height:1.3;">' + esc(item.name) + '</div>'
       if (sub) h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + sub + '</div>'
@@ -1746,6 +1748,8 @@ function renderLogPage() {
       h += '</div>'
       if (expanded) h += logQuantityPanelHtml(type, item)
       h += '</div>'
+      // Séparateur façon iOS : il démarre après la vignette
+      if (idx < list.length - 1) h += '<div style="height:1px;background:var(--border);margin-left:80px;"></div>'
     })
     h += '</div>'
   }
@@ -2329,14 +2333,6 @@ function bindEvents() {
   }
 
   bindCustomMacroInputs()
-
-  // Log meal select
-  const logMealSelect = document.getElementById('log-meal')
-  if (logMealSelect) {
-    logMealSelect.addEventListener('change', () => {
-      state.logMeal = logMealSelect.value
-    })
-  }
 
   // Recherche de la page « Ajouter au journal »
   const logSearchInput = document.getElementById('log-search')
@@ -3183,7 +3179,7 @@ function handleAction(action, el) {
   } else if (action === 'open-add-log') {
     state._logScrollY = window.scrollY
     state.logPage = true
-    state.logType = 'recipe'
+    state.logType = 'ingredient'
     state.logSearch = ''
     state.logExpanded = null
     state.logPortionIdx = null
@@ -3196,6 +3192,9 @@ function handleAction(action, el) {
     state.logExpanded = null
     render()
     window.scrollTo(0, state._logScrollY)
+  } else if (action === 'set-log-meal') {
+    state.logMeal = el.getAttribute('data-meal')
+    render()
   } else if (action === 'set-log-type') {
     state.logType = el.getAttribute('data-type')
     state.logExpanded = null
