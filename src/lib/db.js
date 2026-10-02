@@ -289,6 +289,22 @@ export async function deleteCategory(name) {
   }
 }
 
+// Historique léger du journal d'une personne depuis une date (sert à repérer ce qu'elle mange le plus à chaque repas)
+export async function loadMealHistory(personId, sinceDateStr) {
+  const { data, error } = await supabase
+    .from('logs')
+    .select('kind, ref_id, meal')
+    .eq('person_id', personId)
+    .gte('log_date', sinceDateStr)
+    .order('log_date', { ascending: false })
+
+  if (error) {
+    console.error('Erreur chargement historique des repas:', error)
+    return []
+  }
+  return data || []
+}
+
 // Charger l'historique de poids d'une personne, du plus ancien au plus récent
 export async function loadWeightLogs(personId) {
   const { data, error } = await supabase

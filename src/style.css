@@ -244,3 +244,9 @@ nav.tabs button.active{ color:var(--kcal); background:var(--surface-raised); }
   transform:scale(1.06); border-color:var(--protein);
 }
 .profile-picker-name{ font-size:var(--text-body); font-weight:600; color:var(--text); }
+
+/* Puces de filtre (page « Ajouter au journal ») : rangée défilante, bord à bord */
+.chips{ display:flex; gap:8px; overflow-x:auto; margin:0 -18px 14px; padding:0 18px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+.chips::-webkit-scrollbar{ display:none; }
+.chip{ flex-shrink:0; white-space:nowrap; padding:7px 14px; border:none; border-radius:999px; background:var(--seg-track); color:var(--text); font-size:var(--text-small); font-weight:500; }
+.chip.active{ background:var(--protein); color:#221705; font-weight:600; }

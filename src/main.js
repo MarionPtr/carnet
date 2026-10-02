@@ -20,6 +20,7 @@ import {
   loadFamilies,
   loadCategoryFamilies,
   loadWeightLogs,
+  loadMealHistory,
   saveWeightLog,
   deleteWeightLog,
   addFamily,
@@ -62,7 +63,9 @@ const DISPLAY_PREF_FIELDS = [
   'recipeLayout',
   'recipeVisibleTypes',
   'recipeFavoritesOnly',
-  'collapsedRecipeTypes'
+  'collapsedRecipeTypes',
+  'logFavOnly',
+  'logGrouped'
 ]
 
 function loadDisplayPrefs() {
@@ -152,6 +155,11 @@ const state = {
   logMeal: 'petit-dej',
   logSearch: '',
   logExpanded: null, // { kind: 'recipe' | 'ingredient', id } : ligne dont le panneau de quantité est ouvert
+  logExpandedFrom: 'list', // 'list' ou 'frequent' : où afficher le panneau de quantité
+  logFavOnly: !!savedPrefs.logFavOnly, // page « Ajouter au journal » : favoris uniquement
+  logGrouped: !!savedPrefs.logGrouped, // liste découpée par catégorie (ingrédients) ou par type (recettes)
+  logCategory: null, // puce de catégorie active (non mémorisée : elle dépend de l'onglet)
+  mealHistory: [], // [{ kind, ref_id, meal }] des 90 derniers jours, pour « Souvent mangés »
   logQty: 1, // portions (recette / portion d'ingrédient) ou grammes / ml
   logPortionIdx: null, // null = grammes personnalisés, sinon index dans getIngredientPortions(ing)
   _logScrollY: 0,
@@ -1692,11 +1700,97 @@ function logQuantityPanelHtml(kind, item) {
   return h
 }
 
+const LOG_MEAL_PHRASE = { 'petit-dej': 'au petit-déjeuner', dejeuner: 'au déjeuner', diner: 'au dîner', snacks: 'en snack' }
+
+function logItemGroup(type, item) {
+  return type === 'recipe' ? (item.type || 'Sans type') : (item.category || 'Sans catégorie')
+}
+
+function logIsExpanded(type, id, from) {
+  const e = state.logExpanded
+  return !!e && e.kind === type && e.id === id && state.logExpandedFrom === from
+}
+
+// Ce que la personne a le plus ajouté à ce repas (au moins 2 fois), pour proposer des raccourcis
+function logFrequentItems(type) {
+  const counts = {}
+  state.mealHistory.forEach(e => {
+    if (e.meal === state.logMeal && e.kind === type) counts[e.ref_id] = (counts[e.ref_id] || 0) + 1
+  })
+  const pool = type === 'recipe' ? state.recipes : state.ingredients
+  return pool
+    .filter(i => counts[i.id] >= 2)
+    .sort((a, b) => counts[b.id] - counts[a.id] || a.name.localeCompare(b.name))
+    .slice(0, 6)
+}
+
+function logFrequentHtml(type) {
+  const items = logFrequentItems(type)
+  if (items.length === 0) return ''
+  const open = items.find(i => logIsExpanded(type, i.id, 'frequent'))
+  let h = '<span class="lbl" style="display:block;margin-bottom:8px;">Souvent mangé' + (type === 'recipe' ? 'e' : '') + 's ' + LOG_MEAL_PHRASE[state.logMeal] + '</span>'
+  h += '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:' + (open ? '8px' : '18px') + ';">'
+  items.forEach(item => {
+    const selected = logIsExpanded(type, item.id, 'frequent')
+    h += '<button type="button" data-action="toggle-log-frequent" data-kind="' + type + '" data-id="' + item.id + '" style="min-width:0;background:var(--surface);color:var(--text);border:2px solid ' + (selected ? 'var(--protein)' : 'transparent') + ';border-radius:18px;padding:10px 6px;text-align:center;cursor:pointer;">'
+    h += '<div style="width:52px;height:52px;margin:0 auto 6px;border-radius:14px;overflow:hidden;background:var(--surface-raised);border:1px solid var(--border);">' + logThumbHtml(type, item) + '</div>'
+    h += '<div style="font-size:var(--text-small);font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + esc(item.name) + '</div>'
+    h += '</button>'
+  })
+  h += '</div>'
+  if (open) h += '<div style="border-radius:18px;overflow:hidden;margin-bottom:18px;background:var(--surface);">' + logQuantityPanelHtml(type, open) + '</div>'
+  return h
+}
+
+function logRowHtml(type, item, expanded) {
+  const sub = type === 'recipe'
+    ? round(recipeMacrosPerServing(item, state.ingredients).kcal) + ' kcal / part'
+    : ((item.brands && item.brands.length > 0) ? esc(item.brands.join(', ')) : '')
+  const favAction = type === 'recipe' ? 'toggle-recipe-favorite' : 'toggle-favorite'
+  let h = '<div>'
+  h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px 10px 12px;">'
+  h += '<div style="width:56px;height:56px;flex-shrink:0;border-radius:14px;overflow:hidden;background:var(--surface-raised);border:1px solid var(--border);">' + logThumbHtml(type, item) + '</div>'
+  h += '<div style="flex:1;min-width:0;">'
+  h += '<div style="font-size:var(--text-h3);font-weight:600;line-height:1.3;">' + esc(item.name) + '</div>'
+  if (sub) h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + sub + '</div>'
+  h += '</div>'
+  h += '<button type="button" data-action="' + favAction + '" data-id="' + item.id + '" title="Favori" aria-label="Favori" style="flex-shrink:0;width:28px;height:36px;background:none;border:none;padding:0;font-size:22px;line-height:1;cursor:pointer;color:' + (item.is_favorite ? 'var(--protein)' : 'var(--text-muted)') + ';">' + (item.is_favorite ? '★' : '☆') + '</button>'
+  h += '<button data-action="toggle-log-item" data-kind="' + type + '" data-id="' + item.id + '" title="Ajouter" aria-label="Ajouter ' + esc(item.name) + '" style="width:40px;height:40px;flex-shrink:0;padding:0;line-height:1;border-radius:50%;background:' + (expanded ? 'var(--protein)' : 'var(--surface-raised)') + ';border:1px solid var(--border-strong);color:' + (expanded ? '#221705' : 'var(--text)') + ';font-size:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;"><span style="display:block;transition:transform .15s ease;transform:rotate(' + (expanded ? '45deg' : '0deg') + ');">+</span></button>'
+  h += '</div>'
+  if (expanded) h += logQuantityPanelHtml(type, item)
+  h += '</div>'
+  return h
+}
+
+function logListHtml(type, items) {
+  let h = '<div style="background:var(--surface);border-radius:22px;overflow:hidden;">'
+  items.forEach((item, idx) => {
+    h += logRowHtml(type, item, logIsExpanded(type, item.id, 'list'))
+    // Séparateur façon iOS : il démarre après la vignette
+    if (idx < items.length - 1) h += '<div style="height:1px;background:var(--border);margin-left:80px;"></div>'
+  })
+  return h + '</div>'
+}
+
 function renderLogPage() {
   const q = state.logSearch.trim().toLowerCase()
   const type = state.logType === 'recipe' ? 'recipe' : 'ingredient'
-  const recipes = state.recipes.filter(r => !q || r.name.toLowerCase().indexOf(q) > -1).sort((a, b) => a.name.localeCompare(b.name))
-  const ingredients = state.ingredients.filter(i => !q || ingMatchesSearch(i, q)).sort((a, b) => a.name.localeCompare(b.name))
+  const favOnly = state.logFavOnly
+  const byName = (a, b) => a.name.localeCompare(b.name)
+
+  // Puces de catégorie : celles qui existent vraiment dans l'onglet affiché
+  const pool = type === 'recipe' ? state.recipes : state.ingredients
+  const groups = Array.from(new Set(pool.map(i => logItemGroup(type, i)))).sort((a, b) => a.localeCompare(b))
+  if (state.logCategory && !groups.includes(state.logCategory)) state.logCategory = null
+
+  let recipes = state.recipes.filter(r => (!q || r.name.toLowerCase().indexOf(q) > -1) && (!favOnly || r.is_favorite))
+  let ingredients = state.ingredients.filter(i => (!q || ingMatchesSearch(i, q)) && (!favOnly || i.is_favorite))
+  if (state.logCategory) {
+    if (type === 'recipe') recipes = recipes.filter(r => logItemGroup('recipe', r) === state.logCategory)
+    else ingredients = ingredients.filter(i => logItemGroup('ingredient', i) === state.logCategory)
+  }
+  recipes.sort(byName)
+  ingredients.sort(byName)
   const list = type === 'recipe' ? recipes : ingredients
 
   let h = '<header class="top" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
@@ -1713,12 +1807,25 @@ function renderLogPage() {
   })
   h += '</div></div>'
 
-  h += '<div class="search-wrap" style="position:relative;">'
+  // Recherche + bouton « affichage par catégorie »
+  h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">'
+  h += '<div class="search-wrap" style="position:relative;flex:1;margin-bottom:0;">'
   h += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);pointer-events:none;"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>'
   h += '<input id="log-search" class="search-ios" type="search" placeholder="Rechercher" value="' + esc(state.logSearch) + '"/>'
   if (state.logSearch) {
     h += '<button class="icon-btn" data-action="clear-log-search" aria-label="Effacer la recherche" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:22px;height:22px;padding:0;border-radius:50%;background:var(--text-muted);color:var(--bg);font-size:12px;line-height:22px;display:flex;align-items:center;justify-content:center;">✕</button>'
   }
+  h += '</div>'
+  h += '<button type="button" data-action="toggle-log-grouped" title="Afficher par catégorie" aria-label="Afficher par catégorie" aria-pressed="' + state.logGrouped + '" style="width:43px;height:43px;flex-shrink:0;padding:0;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;background:' + (state.logGrouped ? 'var(--protein)' : 'var(--seg-track)') + ';color:' + (state.logGrouped ? '#221705' : 'var(--text)') + ';">'
+  h += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg></button>'
+  h += '</div>'
+
+  // Puces : favoris, puis une par catégorie
+  h += '<div class="chips">'
+  h += '<button type="button" class="chip' + (favOnly ? ' active' : '') + '" data-action="toggle-log-fav">★ Favoris</button>'
+  groups.forEach(g => {
+    h += '<button type="button" class="chip' + (state.logCategory === g ? ' active' : '') + '" data-action="set-log-category" data-cat="' + esc(g) + '">' + esc(g) + '</button>'
+  })
   h += '</div>'
 
   const count = n => (q ? ' (' + n + ')' : '')
@@ -1727,31 +1834,21 @@ function renderLogPage() {
   h += '<button type="button" class="' + (type === 'recipe' ? 'active' : '') + '" data-action="set-log-type" data-type="recipe" style="font-size:var(--text-body);">Recette' + count(recipes.length) + '</button>'
   h += '</div>'
 
+  // Raccourcis « Souvent mangés » : seulement sans recherche ni filtre
+  if (!q && !favOnly && !state.logCategory) h += logFrequentHtml(type)
+
   if (list.length === 0) {
-    const none = q ? 'Aucun résultat.' : (type === 'recipe' ? 'Aucune recette pour l\'instant.' : 'Aucun ingrédient pour l\'instant.')
+    const none = q ? 'Aucun résultat.' : favOnly ? 'Aucun favori ici pour l\'instant.' : state.logCategory ? 'Rien dans cette catégorie.' : (type === 'recipe' ? 'Aucune recette pour l\'instant.' : 'Aucun ingrédient pour l\'instant.')
     h += '<div class="empty">' + none + '</div>'
-  } else {
-    h += '<div style="background:var(--surface);border-radius:22px;overflow:hidden;">'
-    list.forEach((item, idx) => {
-      const expanded = !!state.logExpanded && state.logExpanded.kind === type && state.logExpanded.id === item.id
-      const sub = type === 'recipe'
-        ? round(recipeMacrosPerServing(item, state.ingredients).kcal) + ' kcal / part'
-        : ((item.brands && item.brands.length > 0) ? esc(item.brands.join(', ')) : '')
-      h += '<div>'
-      h += '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px 10px 12px;">'
-      h += '<div style="width:56px;height:56px;flex-shrink:0;border-radius:14px;overflow:hidden;background:var(--surface-raised);border:1px solid var(--border);">' + logThumbHtml(type, item) + '</div>'
-      h += '<div style="flex:1;min-width:0;">'
-      h += '<div style="font-size:var(--text-h3);font-weight:600;line-height:1.3;">' + esc(item.name) + '</div>'
-      if (sub) h += '<div style="font-size:var(--text-small);color:var(--text-muted);margin-top:2px;">' + sub + '</div>'
-      h += '</div>'
-      h += '<button data-action="toggle-log-item" data-kind="' + type + '" data-id="' + item.id + '" title="Ajouter" aria-label="Ajouter ' + esc(item.name) + '" style="width:40px;height:40px;flex-shrink:0;padding:0;line-height:1;border-radius:50%;background:' + (expanded ? 'var(--protein)' : 'var(--surface-raised)') + ';border:1px solid var(--border-strong);color:' + (expanded ? '#221705' : 'var(--text)') + ';font-size:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;"><span style="display:block;transition:transform .15s ease;transform:rotate(' + (expanded ? '45deg' : '0deg') + ');">+</span></button>'
-      h += '</div>'
-      if (expanded) h += logQuantityPanelHtml(type, item)
-      h += '</div>'
-      // Séparateur façon iOS : il démarre après la vignette
-      if (idx < list.length - 1) h += '<div style="height:1px;background:var(--border);margin-left:80px;"></div>'
+  } else if (state.logGrouped) {
+    const byGroup = {}
+    list.forEach(i => { (byGroup[logItemGroup(type, i)] = byGroup[logItemGroup(type, i)] || []).push(i) })
+    Object.keys(byGroup).sort((a, b) => a.localeCompare(b)).forEach(g => {
+      h += '<div style="font-size:var(--text-body);font-weight:700;margin:16px 0 8px 4px;">' + esc(g) + '</div>'
+      h += logListHtml(type, byGroup[g])
     })
-    h += '</div>'
+  } else {
+    h += logListHtml(type, list)
   }
   h += '</section>'
   return h
@@ -3181,12 +3278,20 @@ function handleAction(action, el) {
     state.logPage = true
     state.logType = 'ingredient'
     state.logSearch = ''
+    state.logCategory = null
     state.logExpanded = null
     state.logPortionIdx = null
     state.logMeal = el.getAttribute('data-meal') || defaultMealForNow()
     state.modal = null
     render()
     window.scrollTo(0, 0)
+    // Historique des 90 derniers jours, pour les raccourcis « Souvent mangés »
+    const since = new Date()
+    since.setDate(since.getDate() - 90)
+    loadMealHistory(state.currentPerson, since.toISOString().slice(0, 10)).then(rows => {
+      state.mealHistory = rows
+      if (state.logPage && !state.logSearch && !state.logExpanded) render()
+    })
   } else if (action === 'close-log-page') {
     state.logPage = false
     state.logExpanded = null
@@ -3195,8 +3300,31 @@ function handleAction(action, el) {
   } else if (action === 'set-log-meal') {
     state.logMeal = el.getAttribute('data-meal')
     render()
+  } else if (action === 'toggle-log-frequent') {
+    const kind = el.getAttribute('data-kind')
+    const id = el.getAttribute('data-id')
+    const open = logIsExpanded(kind, id, 'frequent')
+    state.logExpanded = open ? null : { kind, id }
+    state.logExpandedFrom = 'frequent'
+    state.logQty = kind === 'recipe' ? 1 : 100
+    state.logPortionIdx = null
+    render()
+  } else if (action === 'toggle-log-fav') {
+    state.logFavOnly = !state.logFavOnly
+    state.logExpanded = null
+    render()
+  } else if (action === 'set-log-category') {
+    const cat = el.getAttribute('data-cat')
+    state.logCategory = state.logCategory === cat ? null : cat
+    state.logExpanded = null
+    render()
+  } else if (action === 'toggle-log-grouped') {
+    state.logGrouped = !state.logGrouped
+    state.logExpanded = null
+    render()
   } else if (action === 'set-log-type') {
     state.logType = el.getAttribute('data-type')
+    state.logCategory = null
     state.logExpanded = null
     render()
   } else if (action === 'clear-log-search') {
@@ -3208,6 +3336,7 @@ function handleAction(action, el) {
     const id = el.getAttribute('data-id')
     const open = state.logExpanded && state.logExpanded.kind === kind && state.logExpanded.id === id
     state.logExpanded = open ? null : { kind, id }
+    state.logExpandedFrom = 'list'
     state.logQty = kind === 'recipe' ? 1 : 100
     state.logPortionIdx = null
     render()
@@ -3223,6 +3352,7 @@ function handleAction(action, el) {
     }
     if (sel.kind === 'recipe') logRecipe(sel.item.id, sel.qty)
     else logIngredient(sel.item.id, sel.grams)
+    state.mealHistory.push({ kind: sel.kind, ref_id: sel.item.id, meal: state.logMeal })
     state.logExpanded = null
     showToast('Ajouté au journal')
   } else if (action === 'del-log') {
